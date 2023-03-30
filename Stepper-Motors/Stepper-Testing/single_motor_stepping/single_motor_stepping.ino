@@ -18,8 +18,8 @@
 // TMC2209Stepper driver(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS);
 TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);
 
-uint16_t revolution = 400;
-uint16_t usteps = 16;
+uint16_t revolution = 400; //steps per revolution
+uint16_t usteps = 0;
 
 void setup() {
   pinMode(EN_PIN, OUTPUT);
@@ -35,7 +35,7 @@ void setup() {
   driver.begin();                 //  SPI: Init CS pins and possible SW SPI pins
                                   // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
-  driver.rms_current(600);        // Set motor RMS current
+  driver.rms_current(1200);        // Set motor RMS current
   driver.microsteps(usteps);          // Set microsteps to 1/16th
 
 //driver.en_pwm_mode(true);       // Toggle stealthChop on TMC2130/2160/5130/5160
@@ -47,7 +47,7 @@ bool shaft = false;
 
 void loop() {
   // Run steps and switch direction in software
-  for (uint16_t i = revolution * usteps; i>0; i--) {
+  for (uint16_t i = revolution * 1; i>0; i--) {
     digitalWrite(STEP_PIN, HIGH);
     delayMicroseconds(160);
     digitalWrite(STEP_PIN, LOW);
@@ -55,4 +55,5 @@ void loop() {
   }
   shaft = !shaft;
   driver.shaft(shaft);
+  digitalWrite(DIR_PIN,shaft);
 }
