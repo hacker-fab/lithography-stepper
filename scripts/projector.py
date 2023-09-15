@@ -1,19 +1,36 @@
 from tkinter import Tk, Label, Button, Toplevel, Entry, IntVar, Variable, filedialog
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, split
 from time import sleep
 
 # This code was written by Luca Garlati
 # it is intended for use in Hacker Fab
 # please credit on redistribution
 
+# TODO:
+# - auto convert images to monochrome
+# - convert RGB images to alpha masks
+# - auto apply alpha masks to images
+
+# NOTE:
+# is alpha mask the best option? can I just overlay greyscale
+
+def convert_to_mask(input_image: Image.Image) -> Image.Image:
+  (r,g,b) = input_image.split()
+  mask: Image.Image = Image.new('RGBA', input_image.size())
+  mask.
+
+
+
+
 # declare root tk object
 root: Tk = Tk()
+
 
 ############
 ### Proj ###
 ############
 
-# setup projector window
+# setup projector windows
 proj: Toplevel = Toplevel(root)
 proj.title("Image Window")
 proj.attributes('-fullscreen',True)
