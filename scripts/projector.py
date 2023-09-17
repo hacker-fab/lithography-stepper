@@ -1,5 +1,6 @@
 from tkinter import Tk, Label, Button, Toplevel, Entry, IntVar, Variable, filedialog
-from PIL import ImageTk, Image, split
+from PIL import ImageTk, Image
+from PIL.ImageOps import grayscale
 from time import sleep
 
 # This code was written by Luca Garlati
@@ -14,16 +15,18 @@ from time import sleep
 # NOTE:
 # is alpha mask the best option? can I just overlay greyscale
 
-def convert_to_mask(input_image: Image.Image) -> Image.Image:
-  (r,g,b) = input_image.split()
-  mask: Image.Image = Image.new('RGBA', input_image.size())
-  mask.
-
-
-
-
 # declare root tk object
 root: Tk = Tk()
+
+def convert_to_mask(input_image: Image.Image) -> Image.Image:
+  # copy the image
+  mask: Image.Image = input_image.copy()
+  # convert it to grayscale to normalize all values
+  mask = grayscale(mask)
+  # grab the red channel, since R = G = B
+  (r,g,b) = mask.split()
+  # return r as the mask
+  return r
 
 
 ############
@@ -36,85 +39,129 @@ proj.title("Image Window")
 proj.attributes('-fullscreen',True)
 proj['background'] = '#000000'
 proj.grid_columnconfigure(0, weight=1)
-proj.grid_rowconfigure(0,weight=1)
+proj.grid_rowconfigure(0, weight=1)
 
 # projector variables
 thumbnail_size: tuple[int,int] = (160,90)
 pattern_img: Image.Image = Image.new('RGB', thumbnail_size)
 focus_img:   Image.Image = Image.new('RGB', thumbnail_size)
 uv_img:      Image.Image = Image.new('RGB', thumbnail_size)
-current_img: Label = Label()
+mask_img:    Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
+current_img: Button = Button()
 
-prev_pattern_label: Label = Label()
+prev_pattern_button: Button = Button()
 # set new pattern image
 def set_pattern(query: bool = True):
   global pattern_img
   if(query):
     # save the image
     pattern_img = Image.open(filedialog.askopenfilename(title ='Open')).copy()
-    # delete previous label
-    global prev_pattern_label
-    prev_pattern_label.destroy()
+    # delete previous button
+    global prev_pattern_button
+    prev_pattern_button.destroy()
   # create thumbnail version
   small: Image.Image = pattern_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
   img = ImageTk.PhotoImage(small)
-  # display image with label
-  label: Label = Label(
+  # display image with button
+  button: Button = Button(
     root,
-    image = img)
-  label.image = img
-  label.grid(
-    row = 2,
-    column = 0)
-  prev_pattern_label = label
+    image = img,
+    text = "pattern",
+    compound = "top",
+    command = set_pattern
+    )
+  button.image = img
+  button.grid(
+    row = 1,
+    column = 0,
+    sticky='nesw')
+  prev_pattern_button = button
 
-prev_focusing_label: Label = Label()
+prev_focusing_button: Button = Button()
 # set new pattern image
 def set_focusing(query: bool = True):
   global focus_img
   if(query):
     # save the image
     focus_img = Image.open(filedialog.askopenfilename(title ='Open')).copy()
-    # delete previous label
-    global prev_focusing_label
-    prev_focusing_label.destroy()
+    # delete previous button
+    global prev_focusing_button
+    prev_focusing_button.destroy()
   # create thumbnail version
   small: Image.Image = focus_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
   img = ImageTk.PhotoImage(small)
-  # display image with label
-  label: Label = Label(
+  # display image with button
+  button: Button = Button(
     root,
-    image = img)
-  label.image = img
-  label.grid(
-    row = 2,
-    column = 1)
-  prev_focusing_label = label
+    image = img,
+    text = "red focus",
+    compound = "top",
+    command = set_focusing
+    )
+  button.image = img
+  button.grid(
+    row = 1,
+    column = 2,
+    sticky='nesw')
+  prev_focusing_button = button
 
-prev_uv_focus_label: Label = Label()
+prev_uv_focus_button: Button = Button()
 def set_uv_focus(query: bool = True):
   global uv_img
   if(query):
     # save the image
     uv_img = Image.open(filedialog.askopenfilename(title ='Open')).copy()
-    # delete previous label
-    global prev_uv_focus_label
-    prev_uv_focus_label.destroy()
+    # delete previous button
+    global prev_uv_focus_button
+    prev_uv_focus_button.destroy()
   # create thumbnail version
   small: Image.Image = uv_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
   img = ImageTk.PhotoImage(small)
-  # display image with label
-  label: Label = Label(
+  # display image with button
+  button: Button = Button(
     root,
-    image = img)
-  label.image = img
-  label.grid(
-    row = 2,
-    column = 2)
-  prev_uv_focus_label = label
+    image = img,
+    text = "UV focus",
+    compound = "top",
+    command = set_uv_focus
+    )
+  button.image = img
+  button.grid(
+    row = 1,
+    column = 3,
+    sticky='nesw')
+  prev_uv_focus_button = button
+
+prev_mask_button: Button = Button()
+def set_mask(query: bool = True):
+  global mask_img
+  if(query):
+    # save the image
+    mask_img = Image.open(filedialog.askopenfilename(title ='Select Pattern Image')).copy()
+    # delete previous button
+    global prev_mask_button
+    prev_mask_button.destroy()
+  # create thumbnail version
+  small: Image.Image = mask_img.copy()
+  small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
+  img = ImageTk.PhotoImage(small)
+  # display image with button
+  button: Button = Button(
+    root,
+    image = img,
+    text = "correction",
+    compound = "top",
+    command = set_mask
+    )
+  button.image = img
+  button.grid(
+    row = 1,
+    column = 1,
+    sticky='nesw')
+  prev_mask_button = button
 
 # private method to show an image on the projection window
 def __show_img(input_image: Image.Image):
@@ -143,13 +190,12 @@ def __show_img(input_image: Image.Image):
   img_copy: Image.Image = input_image.copy()
   image = img_copy.resize(fit_image(img_copy), resample=Image.Resampling.LANCZOS)
   photo = ImageTk.PhotoImage(image)
-  # create new label
-  label: Label = Label(proj, image = photo, bg='black')
-  label.image = photo
-  label.grid(row=0,column=0,sticky="nesw")
-  # label.pack(fill='both', anchor='center')
-  # assign this as the current label
-  current_img = label
+  # create new button
+  button: Button = Button(proj, image = photo, bg='black')
+  button.image = photo
+  button.grid(row=0,column=0,sticky="nesw")
+  # assign this as the current button
+  current_img = button
 
 # private method to delete image widget, effectively clearing the proj
 def __hide_img():
@@ -186,13 +232,13 @@ def show_uv_focus():
 
 # setup GUI
 root.title("Control Window")
-root.geometry("700x200")
+root.geometry("800x200")
 # don't make control window resizable
 # root.resizable(width = True, height = True)
 
 # weight all rows / cols
-for row in range(3):
-  root.grid_rowconfigure(row, weight=1)
+root.grid_rowconfigure(0, weight=1)
+root.grid_rowconfigure(1, weight=2)
 for col in range(4):
   root.grid_columnconfigure(col, weight=1)
   
@@ -201,6 +247,7 @@ for col in range(4):
 set_pattern(False)
 set_focusing(False)
 set_uv_focus(False)
+set_mask(False)
 
 ### first row ###
 
@@ -246,37 +293,14 @@ text.grid(
   column = 3,
   sticky='nesw')
 
-### second row
 
-# import pattern image button
-button: Button = Button(
-  root,
-  text = 'import pattern',
-  command = set_pattern)
-button.grid(
-  row = 1,
-  column = 0,
-  sticky='nesw')
-
-# import IR focusing image button
-button: Button = Button(
-  root,
-  text = 'import red focus',
-  command = set_focusing)
-button.grid(
-  row = 1,
-  column = 1,
-  sticky='nesw')
-
-# import UV focusing image button
-button: Button = Button(
-  root,
-  text = 'import UV focus',
-  command = set_uv_focus)
-button.grid(
-  row = 1,
-  column = 2,
-  sticky='nesw')
+def fieldHoverHelper(widget, text):
+  def enter(event):
+    widget.config(image = '', text = text)
+  def leave(event):
+    widget.config(image = image, text = '')
+  widget.bind('<Enter>', enter)
+  widget.bind('<Leave>', leave)
 
 # Show duration field
 duration: Variable = IntVar()
@@ -286,13 +310,15 @@ entry: Entry = Entry(
   textvariable = duration
 )
 entry.grid(
-  row = 1,
-  column = 3,
+  row = 0,
+  column = 4,
   sticky = 'nesw')
 
-### third row
+### second row
 
 # pattern preview
+
+# mask preview
 
 # IR focus preview
 
@@ -306,9 +332,10 @@ pattern_button: Button = Button(
   bg = 'red',
   fg = 'white')
 pattern_button.grid(
-  row = 2,
-  column = 3,
+  row = 1,
+  column = 4,
   sticky='nesw')
+
 
 root.mainloop()
 
