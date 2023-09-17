@@ -293,15 +293,6 @@ text.grid(
   column = 3,
   sticky='nesw')
 
-
-def fieldHoverHelper(widget, text):
-  def enter(event):
-    widget.config(image = '', text = text)
-  def leave(event):
-    widget.config(image = image, text = '')
-  widget.bind('<Enter>', enter)
-  widget.bind('<Leave>', leave)
-
 # Show duration field
 duration: Variable = IntVar()
 duration.set(1000)
