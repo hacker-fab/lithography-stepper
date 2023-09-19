@@ -21,6 +21,7 @@ from litho_img_lib import fit_image, convert_to_alpha_channel
 # - fit alpha 
 # - add a max/min alpha input
 # - add ability to toggle alpha correction for all images on UI
+# - better error handling
 
 # declare root tk object
 root: Tk = Tk()
@@ -31,8 +32,9 @@ root: Tk = Tk()
 #   .3  transferred image utils to separate lib
 #   .4  working alpha mask
 #   .5  several minor code optimizations
+#   .6  reworked UI again 
 # v3    brightness correction implemented
-root.title("Litho V2.4")
+root.title("Litho V3.0")
 
 # Text box at the bottom
 debug_widget: Label = Label(
@@ -42,7 +44,7 @@ debug_widget: Label = Label(
   anchor = 'w'
 )
 debug_widget.grid(
-  row = 2,
+  row = 3,
   column = 0,
   columnspan = 4,
   sticky='nesw'
@@ -53,6 +55,33 @@ def debug(text: str):
   print(text)
   root.update()
 
+# get projector dimentions
+def win_size() -> tuple[int,int]:
+  return (proj.winfo_width(), proj.winfo_height())
+
+# toggle alpha variable for projecting, return new status
+use_alpha: bool = False
+def toggle_alpha():
+  global use_alpha, alpha_button
+  use_alpha = not use_alpha
+  if(use_alpha):
+    alpha_button.config(bg="black", fg="white", text = 'using flat field')
+    debug("Flat field correction ENabled")
+  else:
+    alpha_button.config(bg="white", fg="black", text = 'NOT using flat field')
+    debug("Flat field correction DISabled")
+
+# set alpha range if specified, returns alpha range
+last_alpha_used: tuple[int,int] = (0,0)
+def alpha_range(new_range: tuple[int,int] = (0,0)) -> tuple[int,int]:
+  assert(new_range[0] >= 0)
+  assert(new_range[0] <= 255)
+  assert(new_range[1] >= 0)
+  assert(new_range[1] <= 255)
+  global last_alpha_used
+  if(new_range!=(0,0)):
+    last_alpha_used = new_range
+  return last_alpha_used
 
 ############
 ### Proj ###
@@ -68,7 +97,7 @@ proj.grid_rowconfigure(0, weight=1)
 
 # projector variables
 thumbnail_size: tuple[int,int] = (160,90)
-pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (255,255,255,255))
+pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 focus_img:     Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 uv_img:        Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
@@ -89,7 +118,8 @@ def set_pattern(query: bool = True):
     # save the image
     pattern_img = Image.open(path).copy()
     # resize to projector
-    pattern_img = pattern_img.resize(fit_image())
+    pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
+                                     Image.Resampling.LANCZOS)
   # delete previous button
   prev_pattern_button.destroy()
   # create thumbnail version
@@ -106,7 +136,7 @@ def set_pattern(query: bool = True):
     )
   button.image = img
   button.grid(
-    row = 1,
+    row = 2,
     column = 0,
     sticky='nesw')
   prev_pattern_button = button
@@ -124,6 +154,9 @@ def set_focusing(query: bool = True):
       debug("Red focus set to "+basename(path))
     # save the image
     focus_img = Image.open(path).copy()
+    # resize to projector
+    focus_img = focus_img.resize(fit_image(focus_img, win_size=win_size()),
+                                     Image.Resampling.LANCZOS)
   # delete previous button
   prev_focusing_button.destroy()
   # create thumbnail version
@@ -140,8 +173,8 @@ def set_focusing(query: bool = True):
     )
   button.image = img
   button.grid(
-    row = 1,
-    column = 2,
+    row = 2,
+    column = 3,
     sticky='nesw')
   prev_focusing_button = button
 
@@ -157,6 +190,9 @@ def set_uv_focus(query: bool = True):
       debug("UV focus set to "+basename(path))
     # save the image
     uv_img = Image.open(path).copy()
+    # resize to projector
+    uv_img = uv_img.resize(fit_image(uv_img, win_size=win_size()),
+                                     Image.Resampling.LANCZOS)
   # delete previous button
   prev_uv_focus_button.destroy()
   # create thumbnail version
@@ -173,8 +209,8 @@ def set_uv_focus(query: bool = True):
     )
   button.image = img
   button.grid(
-    row = 1,
-    column = 3,
+    row = 2,
+    column = 4,
     sticky='nesw')
   prev_uv_focus_button = button
 
@@ -188,8 +224,9 @@ def set_mask(query: bool = True):
     mask_img = Image.open(path).copy()
   # create alpha channel using mask
   debug("creating alpha channel mask...")
-  alpha_channel = convert_to_alpha_channel(mask_img, new_scale=(max_alpha.get(), 0), target_size=(proj.winfo_width(), proj.winfo_height()))
-  debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" alpha channel mask")
+  alpha_range((max_alpha.get(), min_alpha.get()))
+  alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+  debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
   # delete previous button
   prev_mask_button.destroy()
   # create thumbnail version
@@ -206,29 +243,38 @@ def set_mask(query: bool = True):
     )
   button.image = img
   button.grid(
-    row = 1,
+    row = 2,
     column = 1,
+    columnspan = 2,
     sticky='nesw')
   prev_mask_button = button
 
 # private method to show an image on the projection window
 max_alpha: Variable = IntVar()
+min_alpha: Variable = IntVar()
 max_alpha.set(255)
-def __show_img(input_image: Image.Image, use_mask:bool = False):
+min_alpha.set(0)
+def __show_img(input_image: Image.Image):
   # setup
   window_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
   img_copy: Image.Image = input_image.copy()
-  # destroy currently displayed image
-  global current_img
-  current_img.destroy()
+  global current_img, alpha_channel
   # resample if image isn't correct size
   if(img_copy.width != window_size[0] or
      img_copy.height != window_size[1]):
-    debug("resampling image...")
+    debug("resampling image for projection...")
     img_copy = img_copy.resize(fit_image(img_copy, window_size), Image.Resampling.LANCZOS)
   # apply alpha mask if enabled
-  if(use_mask):
+  if(use_alpha):
+    # check if alpha has changed
+    if(alpha_range() != (max_alpha.get(), min_alpha.get())):
+      debug("rebuilding mask for projection...")
+      alpha_range((max_alpha.get(), min_alpha.get()))
+      alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+      debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     img_copy.putalpha(alpha_channel)
+  # destroy currently displayed image
+  current_img.destroy()
   # create new button
   photo = ImageTk.PhotoImage(img_copy)
   label: Label = Label(proj, image = photo, bg='black')
@@ -250,9 +296,9 @@ def begin_patterning():
     return
   # prepare for patterning
   global is_patterning
-  debug("Patterning for "+str(duration.get())+"ms...")
   pattern_button.configure(bg="black")
-  __show_img(pattern_img, use_mask=True)
+  __show_img(pattern_img)
+  debug("Patterning for "+str(duration.get())+"ms...")
   # begin
   root.update()
   sleep(duration.get() / 1000)
@@ -283,17 +329,24 @@ def clear_image():
 ### GUI ###
 ###########
 
+
+
 # setup GUI
-root.geometry("800x200")
+root.geometry("900x220")
 # don't make control window resizable
 # root.resizable(width = True, height = True)
 
 # weight all rows / cols
 root.grid_rowconfigure(0, weight=1)
-root.grid_rowconfigure(1, weight=3)
-root.grid_rowconfigure(0, weight=1)
-for col in range(4):
-  root.grid_columnconfigure(col, weight=1)
+root.grid_rowconfigure(1, weight=1)
+root.grid_rowconfigure(2, weight=6)
+root.grid_rowconfigure(3, weight=2)
+
+root.grid_columnconfigure(0, weight=5)
+root.grid_columnconfigure(1, weight=1)
+root.grid_columnconfigure(2, weight=1)
+root.grid_columnconfigure(3, weight=5)
+root.grid_columnconfigure(4, weight=5)
   
 proj.update()
 # show default images
@@ -311,8 +364,20 @@ button: Button = Button(
   fg = 'white')
 button.grid(
   row = 0,
+  rowspan = 2,
   column = 0,
   sticky='nesw')
+
+# Show min_alpha field
+entry: Entry = Entry(
+  root,
+  textvariable = min_alpha,
+  justify = 'center'
+)
+entry.grid(
+  row = 0,
+  column = 1,
+  sticky = 'nesw')
 
 # Show max_alpha field
 entry: Entry = Entry(
@@ -322,8 +387,21 @@ entry: Entry = Entry(
 )
 entry.grid(
   row = 0,
-  column = 1,
+  column = 2,
   sticky = 'nesw')
+
+# toggle alpha mask button
+alpha_button: Button = Button(
+  root,
+  text = 'NOT using flat field',
+  fg = "black",
+  bg = "white",
+  command = toggle_alpha)
+alpha_button.grid(
+  row = 1,
+  column = 1,
+  columnspan = 2,
+  sticky='nesw')
 
 # Show IR focusing image button
 button: Button = Button(
@@ -332,7 +410,8 @@ button: Button = Button(
   command = show_focusing)
 button.grid(
   row = 0,
-  column = 2,
+  rowspan = 2,
+  column = 3,
   sticky='nesw')
 
 # Show UV focusing image button
@@ -342,8 +421,22 @@ button: Button = Button(
   command = show_uv_focus)
 button.grid(
   row = 0,
-  column = 3,
+  rowspan = 2,
+  column = 4,
   sticky='nesw')
+
+# "duration ms" text field
+label: Label = Label(
+  root,
+  text = "duration ms",
+  justify = 'center',
+  anchor = 'center'
+)
+label.grid(
+  row = 0,
+  column = 5,
+  sticky='nesw'
+)
 
 # Show duration field
 duration: Variable = IntVar()
@@ -354,8 +447,8 @@ entry: Entry = Entry(
   justify = 'center'
 )
 entry.grid(
-  row = 0,
-  column = 4,
+  row = 1,
+  column = 5,
   sticky = 'nesw')
 
 # pattern the selected image
@@ -366,9 +459,9 @@ pattern_button: Button = Button(
   bg = 'red',
   fg = 'white')
 pattern_button.grid(
-  row = 1,
+  row = 2,
   rowspan = 2,
-  column = 4,
+  column = 5,
   sticky='nesw')
 
 

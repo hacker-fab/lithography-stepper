@@ -114,8 +114,6 @@ def rescale(image: Image.Image, new_scale: tuple[int,int]) -> Image.Image:
   return mask
 
 
-
-
 # returns an alpha channel mask equivalent from source image
 # optionally specify new scale
 # optionally specify new cropped size
