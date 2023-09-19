@@ -1,8 +1,8 @@
 from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label
 from PIL import ImageTk, Image
-from PIL.ImageOps import grayscale, invert
-from time import sleep, time
+from time import sleep
 from os.path import basename
+from litho_img_lib import fit_image, convert_to_alpha_channel
 
 # This code was written by Luca Garlati
 # it is intended for use in Hacker Fab
@@ -19,6 +19,8 @@ from os.path import basename
 # - - Show progress when patterning
 # - - Show progress when generating mask
 # - fit alpha 
+# - add a max/min alpha input
+# - add ability to toggle alpha correction for all images on UI
 
 # declare root tk object
 root: Tk = Tk()
@@ -26,92 +28,31 @@ root: Tk = Tk()
 # v2    added UV focus image option
 #   .1  major UI overhaul
 #   .2  added debug printouts
+#   .3  transferred image utils to separate lib
+#   .4  working alpha mask
+#   .5  several minor code optimizations
 # v3    brightness correction implemented
-root.title("Litho V2.3")
+root.title("Litho V2.4")
 
 # Text box at the bottom
-debug: Label = Label(
+debug_widget: Label = Label(
   root,
   text = "test",
   justify = 'left',
   anchor = 'w'
 )
-debug.grid(
+debug_widget.grid(
   row = 2,
   column = 0,
   columnspan = 4,
   sticky='nesw'
 )
 
-def show_debug(text: str):
-  debug.config(text = text+"\nMade by Luca Garlati")
+def debug(text: str):
+  debug_widget.config(text = text+"\nMade by Luca Garlati")
+  print(text)
   root.update()
 
-
-###############
-### masking ###
-###############
-
-# returns an alpha channel mask equivalent from source image
-def convert_to_alpha_channel(input_image: Image.Image) -> Image.Image:  #rescale pixel brightness
-  def rescale(scale_old: tuple[int,int], scale_new: tuple[int,int], value: int) -> int:
-    if(scale_old[0] == scale_old[1]):
-      if(value == scale_old[0]):
-        return scale_new[0]
-      else:
-        print("internal error: errno 3")
-        show_debug("internal error: errno 3")
-        return -1
-    if(scale_old[0] < scale_old[1]):
-      print("internal error: errno 0")
-      show_debug("internal error: errno 0")
-      return -1
-    if(scale_new[0] <= scale_new[1]):
-      print("internal error: errno 1")
-      show_debug("internal error: errno 1")
-      return -1
-    # get % into the scale
-    d = (value - scale_old[1]) / (scale_old[0] - scale_old[1])
-    # convert to float in second scale
-    return round((d * (scale_new[0]-scale_new[1])) + scale_new[1])
-    
-  global max_alpha
-  #check max alpha
-  if (max_alpha.get() < 0):
-    show_debug("alpha = "+str(max_alpha.get())+" < 0, aborting")
-    return Image.Image()
-  elif (max_alpha.get() > 255):
-    show_debug("alpha = "+str(max_alpha.get())+" > 255, aborting")
-    return Image.Image()
-  # copy the image
-  mask: Image.Image = input_image.copy()
-  # convert it to grayscale to normalize all values
-  mask = mask.convert("L")
-  # Invert all colors since we want the mask, not the image itself
-  mask = invert(mask)
-  # Normalize the values to be up to max alpha
-  # first step is getting brightest and darkest pixel values
-  duration:int = int(time())
-  show_debug("Parsing ("+str(mask.width)+","+str(mask.height)+") mask...")
-  brightness: list[int] = [0,255]
-  for col in range(mask.width):
-    for row in range(mask.height):
-      # get single-value brightness since it's grayscale
-      pixel = mask.getpixel((col, row))
-      if pixel < brightness[1]:
-        brightness[1] = pixel
-      if pixel > brightness[0]:
-        brightness[0] = pixel
-  # now rescale each pixel
-  show_debug("Generating ("+str(mask.width)+","+str(mask.height)+") alpha channel...")
-  for col in range(mask.width):
-    for row in range(mask.height):
-      mask.putpixel((col,row), rescale((brightness[0],brightness[1]),
-                                       (max_alpha.get(), 0), 
-                                       mask.getpixel((col,row))))
-  show_debug("finshed building mask in "+str(int(time())-duration)+" seconds")
-  # now mask is finally done
-  return mask
 
 ############
 ### Proj ###
@@ -127,29 +68,30 @@ proj.grid_rowconfigure(0, weight=1)
 
 # projector variables
 thumbnail_size: tuple[int,int] = (160,90)
-pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
+pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (255,255,255,255))
 focus_img:     Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 uv_img:        Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
-current_img:   Label = Label()
 alpha_channel: Image.Image
+current_img:   Label = Label()
 
 prev_pattern_button: Button = Button()
 # set new pattern image
 def set_pattern(query: bool = True):
-  global pattern_img
+  global pattern_img, prev_pattern_button
   if(query):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      show_debug("Pattern import cancelled")
+      debug("Pattern import cancelled")
     else:
-      show_debug("Pattern set to "+basename(path))
+      debug("Pattern set to "+basename(path))
     # save the image
     pattern_img = Image.open(path).copy()
-    # delete previous button
-    global prev_pattern_button
-    prev_pattern_button.destroy()
+    # resize to projector
+    pattern_img = pattern_img.resize(fit_image())
+  # delete previous button
+  prev_pattern_button.destroy()
   # create thumbnail version
   small: Image.Image = pattern_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
@@ -172,19 +114,18 @@ def set_pattern(query: bool = True):
 prev_focusing_button: Button = Button()
 # set new pattern image
 def set_focusing(query: bool = True):
-  global focus_img
+  global focus_img, prev_focusing_button
   if(query):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      show_debug("Red focus import cancelled")
+      debug("Red focus import cancelled")
     else:
-      show_debug("Red focus set to "+basename(path))
+      debug("Red focus set to "+basename(path))
     # save the image
     focus_img = Image.open(path).copy()
-    # delete previous button
-    global prev_focusing_button
-    prev_focusing_button.destroy()
+  # delete previous button
+  prev_focusing_button.destroy()
   # create thumbnail version
   small: Image.Image = focus_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
@@ -206,19 +147,18 @@ def set_focusing(query: bool = True):
 
 prev_uv_focus_button: Button = Button()
 def set_uv_focus(query: bool = True):
-  global uv_img
+  global uv_img, prev_uv_focus_button
   if(query):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      show_debug("UV focus import cancelled")
+      debug("UV focus import cancelled")
     else:
-      show_debug("UV focus set to "+basename(path))
+      debug("UV focus set to "+basename(path))
     # save the image
     uv_img = Image.open(path).copy()
-    # delete previous button
-    global prev_uv_focus_button
-    prev_uv_focus_button.destroy()
+  # delete previous button
+  prev_uv_focus_button.destroy()
   # create thumbnail version
   small: Image.Image = uv_img.copy()
   small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
@@ -240,18 +180,16 @@ def set_uv_focus(query: bool = True):
 
 prev_mask_button: Button = Button()
 def set_mask(query: bool = True):
-  global mask_img, alpha_channel, prev_mask_button
+  global mask_img, prev_mask_button, alpha_channel
   if(query):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
-    if(path == ''):
-      show_debug("Correction image import cancelled")
-    else:
-      show_debug("Correction image set to "+basename(path))
     # save the image
     mask_img = Image.open(path).copy()
-  # generate alpha channel mask
-  alpha_channel = convert_to_alpha_channel(mask_img)
+  # create alpha channel using mask
+  debug("creating alpha channel mask...")
+  alpha_channel = convert_to_alpha_channel(mask_img, new_scale=(max_alpha.get(), 0), target_size=(proj.winfo_width(), proj.winfo_height()))
+  debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" alpha channel mask")
   # delete previous button
   prev_mask_button.destroy()
   # create thumbnail version
@@ -277,69 +215,22 @@ def set_mask(query: bool = True):
 max_alpha: Variable = IntVar()
 max_alpha.set(255)
 def __show_img(input_image: Image.Image, use_mask:bool = False):
-  
-  # return max image size that will fit in window without cropping
-  def fit_image(image: Image.Image) -> tuple[int,int]:
-    # for easier access
-    win_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
-    img_size: tuple[int,int] = (image.width, image.height)
-    #determine orientation to fit to
-    if (img_size[0] / img_size[1]) < (win_size[0] / win_size[1]):
-      # fit to height
-      return (int(img_size[0] * (win_size[1] / img_size[1])), win_size[1])
-    elif (img_size[0] / img_size[1]) > (win_size[0] / win_size[1]):
-      # fit to width
-      ratio = (win_size[1] / img_size[1])
-      return (win_size[0],int(img_size[1] * (win_size[0] / img_size[0])))
-    else:
-      # same ratio
-      return win_size
-  
-  # return min image size that will fill in window
-  def fill_image(image: Image.Image) -> tuple[int,int]:
-    # for easier access
-    win_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
-    img_size: tuple[int,int] = (image.width, image.height)
-    # determine orientation to fit to
-    if (img_size[0] / img_size[1]) < (win_size[0] / win_size[1]):
-      # fit to height
-      return (int(img_size[0] * (win_size[1] / img_size[1])), win_size[1])
-    elif (img_size[0] / img_size[1]) > (win_size[0] / win_size[1]):
-      # fit to width
-      ratio = (win_size[1] / img_size[1])
-      return (win_size[0],int(img_size[1] * (win_size[0] / img_size[0])))
-    else:
-      # same ratio
-      return win_size
-
+  # setup
+  window_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
+  img_copy: Image.Image = input_image.copy()
   # destroy currently displayed image
   global current_img
   current_img.destroy()
-  # modify image to fit window without stretch
-  img_copy: Image.Image = input_image.copy()
-  new_size: tuple[int,int] = fit_image(img_copy)
-  image = img_copy.resize(new_size, resample=Image.Resampling.LANCZOS)
+  # resample if image isn't correct size
+  if(img_copy.width != window_size[0] or
+     img_copy.height != window_size[1]):
+    debug("resampling image...")
+    img_copy = img_copy.resize(fit_image(img_copy, window_size), Image.Resampling.LANCZOS)
+  # apply alpha mask if enabled
   if(use_mask):
-    # resize alpha mask
-    mask = alpha_channel.resize(fit_image(alpha_channel), resample=Image.Resampling.LANCZOS)
-    # putalpha requires alpha channel to be same size as original image
-    # so we need to crop accordingly (left,top,right,bottom)
-    diff: int = mask.width - image.width
-    if(diff < 0):
-      # if alpha channel is taller than image, abort
-      print("internal error: errno 2")
-      show_debug("internal error: errno 2")
-      return
-    left: int = (diff//2)
-    right: int = image.width - (diff//2)
-    # image sizes need to match exactly, so if odd, add 1 to right
-    if(diff % 2 == 1):
-      right += 1
-    mask = mask.crop((left, 0, right, mask.height))
-    # finally, apply alpha mask
-    image.putalpha(mask)
-  photo = ImageTk.PhotoImage(image)
+    img_copy.putalpha(alpha_channel)
   # create new button
+  photo = ImageTk.PhotoImage(img_copy)
   label: Label = Label(proj, image = photo, bg='black')
   label.image = photo
   label.grid(row=0,column=0,sticky="nesw")
@@ -355,11 +246,11 @@ def __hide_img():
 def begin_patterning():
   # check duration and alpha are valid
   if (duration.get() <= 0):
-    show_debug("duration = "+str(duration.get())+" < 0, aborting")
+    debug("duration = "+str(duration.get())+" < 0, aborting")
     return
   # prepare for patterning
   global is_patterning
-  show_debug("Patterning for "+str(duration.get())+"ms at "+str(max_alpha.get())+" alpha...")
+  debug("Patterning for "+str(duration.get())+"ms...")
   pattern_button.configure(bg="black")
   __show_img(pattern_img, use_mask=True)
   # begin
@@ -369,24 +260,24 @@ def begin_patterning():
   __hide_img()
   pattern_button.configure(bg="red")
   root.update()
-  show_debug("Finished patterning")
+  debug("Finished patterning")
 
 # show patterning image
 def show_focusing():
   __show_img(focus_img)
-  show_debug("showing red focus pattern")
+  debug("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
   __show_img(uv_img)
-  show_debug("showing uv focus pattern")
+  debug("showing uv focus pattern")
   root.update()
 
 # wrapper for clear button
 def clear_image():
   __hide_img()
-  show_debug("Projector cleared")
+  debug("Projector cleared")
 
 ###########
 ### GUI ###
@@ -404,7 +295,7 @@ root.grid_rowconfigure(0, weight=1)
 for col in range(4):
   root.grid_columnconfigure(col, weight=1)
   
-
+proj.update()
 # show default images
 set_pattern(False)
 set_focusing(False)
@@ -482,6 +373,6 @@ pattern_button.grid(
 
 
 
-show_debug("Debug info will be displayed here.")
+debug("Debug info will be displayed here.")
 root.mainloop()
 

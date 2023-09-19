@@ -1,2 +1,3 @@
 scripts/*.jpg
 scripts/*png
+__pycache__
