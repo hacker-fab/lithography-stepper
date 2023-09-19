@@ -34,7 +34,8 @@ root: Tk = Tk()
 #   .5  several minor code optimizations
 #   .6  reworked UI again 
 # v3    brightness correction implemented
-root.title("Litho V3.0")
+#   .1  idiot-proofing
+root.title("Litho V3.1")
 
 # Text box at the bottom
 debug_widget: Label = Label(
@@ -103,6 +104,33 @@ uv_img:        Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
 alpha_channel: Image.Image
 current_img:   Label = Label()
+
+def update_alpha_channel() -> bool:
+  # if we don't need to update, then we already know it's good (recursive assurance)
+  alphas: tuple[int,int] = (min_alpha.get(), max_alpha.get())
+  if (alpha_range() == alphas):
+    return True
+  else:
+    if(alphas[0] < 0):
+      debug("min alpha < 0")
+      return False
+    if(alphas[0] > 255):
+      debug("min alpha > 255")
+      return False
+    if(alphas[1] < 0):
+      debug("max alpha < 0")
+      return False
+    if(alphas[1] > 255):
+      debug("max alpha > 255")
+      return False
+    if(alphas[0] > alphas[1]):
+      debug("min > max alpha")
+      return False
+    #update alpha stuff
+    alpha_range(alphas)
+    global alpha_channel
+    alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+    return True
 
 prev_pattern_button: Button = Button()
 # set new pattern image
@@ -224,8 +252,9 @@ def set_mask(query: bool = True):
     mask_img = Image.open(path).copy()
   # create alpha channel using mask
   debug("creating alpha channel mask...")
-  alpha_range((max_alpha.get(), min_alpha.get()))
-  alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+  success = update_alpha_channel()
+  if(not success):
+    return
   debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
   # delete previous button
   prev_mask_button.destroy()
@@ -254,7 +283,7 @@ max_alpha: Variable = IntVar()
 min_alpha: Variable = IntVar()
 max_alpha.set(255)
 min_alpha.set(0)
-def __show_img(input_image: Image.Image):
+def __show_img(input_image: Image.Image) -> bool:
   # setup
   window_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
   img_copy: Image.Image = input_image.copy()
@@ -269,8 +298,9 @@ def __show_img(input_image: Image.Image):
     # check if alpha has changed
     if(alpha_range() != (max_alpha.get(), min_alpha.get())):
       debug("rebuilding mask for projection...")
-      alpha_range((max_alpha.get(), min_alpha.get()))
-      alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+      success = update_alpha_channel()
+      if(not success):
+        return False
       debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     img_copy.putalpha(alpha_channel)
   # destroy currently displayed image
@@ -282,6 +312,7 @@ def __show_img(input_image: Image.Image):
   label.grid(row=0,column=0,sticky="nesw")
   # assign this as the current button
   current_img = label
+  return True
 
 # private method to delete image widget, effectively clearing the proj
 def __hide_img():
@@ -297,7 +328,8 @@ def begin_patterning():
   # prepare for patterning
   global is_patterning
   pattern_button.configure(bg="black")
-  __show_img(pattern_img)
+  if(not __show_img(pattern_img)):
+    return
   debug("Patterning for "+str(duration.get())+"ms...")
   # begin
   root.update()
@@ -310,13 +342,15 @@ def begin_patterning():
 
 # show patterning image
 def show_focusing():
-  __show_img(focus_img)
+  if(not __show_img(focus_img)):
+    return
   debug("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
-  __show_img(uv_img)
+  if(not __show_img(uv_img)):
+    return
   debug("showing uv focus pattern")
   root.update()
 
