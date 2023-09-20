@@ -40,12 +40,12 @@ def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: i
         return new_scale[0]
       else:
         assert(value == old_scale[0])
-    assert(old_scale[0] > old_scale[1])
-    assert(new_scale[0] > new_scale[1])
+    assert(old_scale[0] < old_scale[1])
+    assert(new_scale[0] < new_scale[1])
     # get % into the scale
-    d = (value - old_scale[1]) / (old_scale[0] - old_scale[1])
-    # convert to float in second scale
-    return round((d * (new_scale[0]-new_scale[1])) + new_scale[1])
+    d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
+    # convert to second scale
+    return round((d * (new_scale[1]-new_scale[0])) + new_scale[0])
 
 
 # return a center cropped version of image at desired resolution
@@ -92,15 +92,15 @@ def rescale(image: Image.Image, new_scale: tuple[int,int]) -> Image.Image:
   mask: Image.Image = image.copy()
   assert(mask.mode == "L")
   # first step is getting brightest and darkest pixel values
-  brightness: list[int] = [0,255]
+  brightness: list[int] = [255,0]
   for col in range(mask.width):
     for row in range(mask.height):
       # get single-value brightness since it's grayscale
       pixel = mask.getpixel((col, row))
-      if pixel < brightness[1]:
-        brightness[1] = pixel
-      if pixel > brightness[0]:
+      if pixel < brightness[0]:
         brightness[0] = pixel
+      if pixel > brightness[1]:
+        brightness[1] = pixel
   # now rescale each pixel
   lut: dict = {}
   for col in range(mask.width):
@@ -169,8 +169,8 @@ def __run_tests():
   # fill to height
   print_assert(fill_image(img1, dim0), (300,200))
   
-  old_scale = (110,10)
-  new_scale = (15,5)
+  old_scale = (10,110)
+  new_scale = (5,15)
   # min value check
   print_assert(rescale_value(old_scale, new_scale, 10), 5)
   # max value check

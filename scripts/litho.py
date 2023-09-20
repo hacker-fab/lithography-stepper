@@ -34,8 +34,9 @@ root: Tk = Tk()
 #   .5  several minor code optimizations
 #   .6  reworked UI again 
 # v3    brightness correction implemented
-#   .1  idiot-proofing
-root.title("Litho V3.1")
+#   .1  fixed alpha updating bug
+#   .2  idiot-proofing and beautifying
+root.title("Litho V3.2")
 
 # Text box at the bottom
 debug_widget: Label = Label(
@@ -75,13 +76,20 @@ def toggle_alpha():
 # set alpha range if specified, returns alpha range
 last_alpha_used: tuple[int,int] = (0,0)
 def alpha_range(new_range: tuple[int,int] = (0,0)) -> tuple[int,int]:
-  assert(new_range[0] >= 0)
-  assert(new_range[0] <= 255)
-  assert(new_range[1] >= 0)
-  assert(new_range[1] <= 255)
   global last_alpha_used
-  if(new_range!=(0,0)):
-    last_alpha_used = new_range
+  # check if query or assignment
+  if(new_range==(0,0)):
+    return last_alpha_used
+  # assignment, validate input
+  if not (new_range[0] >= 0 and
+          new_range[0] <= 255 and
+          new_range[1] >= 0 and
+          new_range[1] <= 255 and
+          new_range[0] < new_range[1]):
+    debug("invalid alpha range: "+str(new_range))
+    assert(False)
+  #assign new value and return
+  last_alpha_used = new_range
   return last_alpha_used
 
 ############
@@ -105,33 +113,29 @@ mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
 alpha_channel: Image.Image
 current_img:   Label = Label()
 
-def update_alpha_channel() -> bool:
+# makes a photo thumbnail copy at specified size
+def auto_thumbnail(image: Image.Image, size: tuple[int,int] = thumbnail_size) -> ImageTk.PhotoImage:
+  thumb: Image.Image = image.copy()
+  thumb.thumbnail(size, Image.Resampling.LANCZOS)
+  return ImageTk.PhotoImage(thumb)
+
+# updates alpha channel to current settings
+def update_alpha_channel(force:bool = False):
+  global alpha_channel
   # if we don't need to update, then we already know it's good (recursive assurance)
   alphas: tuple[int,int] = (min_alpha.get(), max_alpha.get())
-  if (alpha_range() == alphas):
-    return True
+  if (alpha_range() == alphas and not force):
+    debug("skipped updating")
+    return 
   else:
-    if(alphas[0] < 0):
-      debug("min alpha < 0")
-      return False
-    if(alphas[0] > 255):
-      debug("min alpha > 255")
-      return False
-    if(alphas[1] < 0):
-      debug("max alpha < 0")
-      return False
-    if(alphas[1] > 255):
-      debug("max alpha > 255")
-      return False
-    if(alphas[0] > alphas[1]):
-      debug("min > max alpha")
-      return False
+    global alpha_channel, prev_mask_button
     #update alpha stuff
     alpha_range(alphas)
-    global alpha_channel
     alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
-    return True
-
+    prev_mask_button.image = auto_thumbnail(alpha_channel)
+    prev_mask_button.config(image=prev_mask_button.image)
+    
+    
 prev_pattern_button: Button = Button()
 # set new pattern image
 def set_pattern(query: bool = True):
@@ -151,9 +155,7 @@ def set_pattern(query: bool = True):
   # delete previous button
   prev_pattern_button.destroy()
   # create thumbnail version
-  small: Image.Image = pattern_img.copy()
-  small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-  img = ImageTk.PhotoImage(small)
+  img = auto_thumbnail(pattern_img)
   # display image with button
   button: Button = Button(
     root,
@@ -188,9 +190,7 @@ def set_focusing(query: bool = True):
   # delete previous button
   prev_focusing_button.destroy()
   # create thumbnail version
-  small: Image.Image = focus_img.copy()
-  small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-  img = ImageTk.PhotoImage(small)
+  img = auto_thumbnail(focus_img)
   # display image with button
   button: Button = Button(
     root,
@@ -224,9 +224,7 @@ def set_uv_focus(query: bool = True):
   # delete previous button
   prev_uv_focus_button.destroy()
   # create thumbnail version
-  small: Image.Image = uv_img.copy()
-  small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-  img = ImageTk.PhotoImage(small)
+  img = auto_thumbnail(uv_img)
   # display image with button
   button: Button = Button(
     root,
@@ -252,16 +250,12 @@ def set_mask(query: bool = True):
     mask_img = Image.open(path).copy()
   # create alpha channel using mask
   debug("creating alpha channel mask...")
-  success = update_alpha_channel()
-  if(not success):
-    return
+  update_alpha_channel(force=True)
   debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
   # delete previous button
   prev_mask_button.destroy()
   # create thumbnail version
-  small: Image.Image = mask_img.copy()
-  small.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-  img = ImageTk.PhotoImage(small)
+  img = auto_thumbnail(alpha_channel)
   # display image with button
   button: Button = Button(
     root,
@@ -296,11 +290,9 @@ def __show_img(input_image: Image.Image) -> bool:
   # apply alpha mask if enabled
   if(use_alpha):
     # check if alpha has changed
-    if(alpha_range() != (max_alpha.get(), min_alpha.get())):
+    if(alpha_range() != (min_alpha.get(), max_alpha.get())):
       debug("rebuilding mask for projection...")
-      success = update_alpha_channel()
-      if(not success):
-        return False
+      update_alpha_channel()
       debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     img_copy.putalpha(alpha_channel)
   # destroy currently displayed image
@@ -312,7 +304,6 @@ def __show_img(input_image: Image.Image) -> bool:
   label.grid(row=0,column=0,sticky="nesw")
   # assign this as the current button
   current_img = label
-  return True
 
 # private method to delete image widget, effectively clearing the proj
 def __hide_img():
@@ -328,8 +319,7 @@ def begin_patterning():
   # prepare for patterning
   global is_patterning
   pattern_button.configure(bg="black")
-  if(not __show_img(pattern_img)):
-    return
+  __show_img(pattern_img)
   debug("Patterning for "+str(duration.get())+"ms...")
   # begin
   root.update()
@@ -342,15 +332,13 @@ def begin_patterning():
 
 # show patterning image
 def show_focusing():
-  if(not __show_img(focus_img)):
-    return
+  __show_img(focus_img)
   debug("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
-  if(not __show_img(uv_img)):
-    return
+  __show_img(uv_img)
   debug("showing uv focus pattern")
   root.update()
 
