@@ -10,29 +10,17 @@ from litho_img_lib import fit_image, convert_to_alpha_channel
 
 # TODO:
 # - auto convert images to monochrome
-# - convert RGB images to alpha masks
-# - auto apply alpha masks to images
 # - add help popup window
 # - auto crop correction images
-# - use a dict to speed up mask creation
 # - add progress bar
 # - - Show progress when patterning
 # - - Show progress when generating mask
-# - fit alpha 
-# - add a max/min alpha input
-# - add ability to toggle alpha correction for all images on UI
-# - better error handling
+# - implement a proper error creation and handling system
 
 # declare root tk object
 root: Tk = Tk()
 # v1    working initial prototype
 # v2    added UV focus image option
-#   .1  major UI overhaul
-#   .2  added debug printouts
-#   .3  transferred image utils to separate lib
-#   .4  working alpha mask
-#   .5  several minor code optimizations
-#   .6  reworked UI again 
 # v3    brightness correction implemented
 #   .1  fixed alpha updating bug
 #   .2  idiot-proofing and beautifying
