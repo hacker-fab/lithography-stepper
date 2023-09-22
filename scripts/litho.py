@@ -112,16 +112,23 @@ def update_alpha_channel(force:bool = False):
   global alpha_channel
   # if we don't need to update, then we already know it's good (recursive assurance)
   alphas: tuple[int,int] = (min_alpha.get(), max_alpha.get())
-  if (alpha_range() == alphas and not force):
+  target_size: tuple[int,int] = fit_image(pattern_img, win_size())
+  if(not force): 
+    debug("checking if mask needs updating...")
+  if (alpha_range() == alphas and 
+      mask_img.size == target_size and 
+      not force):
     debug("skipped updating")
-    return 
+    return
   else:
+    debug("updating mask...")
     global alpha_channel, prev_mask_button
     #update alpha stuff
     alpha_range(alphas)
-    alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=(proj.winfo_width(), proj.winfo_height()))
+    alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=target_size)
     prev_mask_button.image = auto_thumbnail(alpha_channel)
     prev_mask_button.config(image=prev_mask_button.image)
+    debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     
     
 prev_pattern_button: Button = Button()
@@ -265,7 +272,7 @@ max_alpha: Variable = IntVar()
 min_alpha: Variable = IntVar()
 max_alpha.set(255)
 min_alpha.set(0)
-def __show_img(input_image: Image.Image) -> bool:
+def __show_img(input_image: Image.Image):
   # setup
   window_size: tuple[int,int] = (proj.winfo_width(), proj.winfo_height())
   img_copy: Image.Image = input_image.copy()
@@ -278,10 +285,10 @@ def __show_img(input_image: Image.Image) -> bool:
   # apply alpha mask if enabled
   if(use_alpha):
     # check if alpha has changed
-    if(alpha_range() != (min_alpha.get(), max_alpha.get())):
-      debug("rebuilding mask for projection...")
-      update_alpha_channel()
-      debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
+    update_alpha_channel()
+    if(img_copy.size != alpha_channel.size):
+      debug("mismatch image sizes:\npattern: "+str(img_copy.size)+"\nmask: "+str(alpha_channel.size)+"\nproj: "+str((proj.winfo_width(),proj.winfo_height())))
+      assert(False)
     img_copy.putalpha(alpha_channel)
   # destroy currently displayed image
   current_img.destroy()
