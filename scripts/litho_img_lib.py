@@ -34,6 +34,7 @@ def fill_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
     return win_size
 
 
+# convert a value on one scale to the same location on another scale
 def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
     if(old_scale[0] == old_scale[1]):
       if(value == old_scale[0]):
@@ -83,7 +84,6 @@ def center_crop(image: Image.Image, crop_size: tuple[int,int]) -> Image.Image:
   
   # done
   return cropped
-
 
 
 # returns a rescaled copy of an alpha mask
@@ -142,6 +142,23 @@ def convert_to_alpha_channel(input_image: Image.Image,
     mask = center_crop(mask, target_size)
   # done
   return mask
+
+
+# return an alpha mask image applied to another image
+def apply_mask(input_image: Image.Image,
+               mask_image: Image.Image,
+               new_scale: tuple[int,int] = (0,255)) -> Image.Image:
+  # setup
+  input_img_copy: Image.Image = input_image.copy()
+  target_size: tuple[int,int] = input_image.size()
+  # create mask and apply
+  alpha_mask: Image.Image = convert_to_alpha_channel(mask_image, new_scale=new_scale, target_size=target_size)
+  input_img_copy.putalpha(alpha_mask)
+  # flatten image
+  background: Image.Image = Image.new("RGB", target_size)
+  background.paste(foreground, (0,0), foreground)
+  # return image
+  return background
 
 
 def __run_tests():
