@@ -150,16 +150,15 @@ def apply_mask(input_image: Image.Image,
                new_scale: tuple[int,int] = (0,255)) -> Image.Image:
   # setup
   input_img_copy: Image.Image = input_image.copy()
-  target_size: tuple[int,int] = input_image.size()
+  target_size: tuple[int,int] = input_image.size
   # create mask and apply
   alpha_mask: Image.Image = convert_to_alpha_channel(mask_image, new_scale=new_scale, target_size=target_size)
   input_img_copy.putalpha(alpha_mask)
   # flatten image
   background: Image.Image = Image.new("RGB", target_size)
-  background.paste(foreground, (0,0), foreground)
+  background.paste(input_img_copy, (0,0), input_img_copy)
   # return image
   return background
-
 
 def __run_tests():
   def print_assert(a, b):
@@ -213,8 +212,11 @@ def __run_tests():
   print_assert(center_crop(img0, dim0).size, dim0)
   print_assert(center_crop(img2, dim2).size, dim2)
   
-  # visual check of alpha mask
+  # inputs for visual tests
   # image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
   # mask: Image.Image  = Image.open(filedialog.askopenfilename(title ='Test mask')).copy()
+  
+  # apply_mask(image, mask).show()
+  
   print("all tests passed")
 __run_tests()
