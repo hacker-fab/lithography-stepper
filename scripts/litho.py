@@ -19,9 +19,8 @@ root: Tk = Tk()
 # v1    working initial prototype
 # v2    added UV focus image option
 # v3    brightness correction implemented
-#   .1  fixed alpha updating bug
-#   .2  idiot-proofing and beautifying
-#   .3  added posterizing
+# v4    heavily refatored back end
+#   .1  
 root.title("Litho V3.3")
 
 # Text box at the bottom
@@ -43,35 +42,79 @@ def debug(text: str):
   print(text)
   root.update()
 
+
+# creates toggle widget
+class Toggle():
+  # mandatory / main fields
+  widget: Button
+  state: bool
+  
+  # user-inputted fields
+  text: tuple[str,str]
+  colors: tuple[str,str]
+  
+  def __init__(self, text: tuple[str,str], 
+                     colors: tuple[str,str] = ("black", "white"), 
+                     initial_state:bool=False):
+    # set fields
+    self.text = text
+    self.colors = colors
+    self.state = initial_state
+    # create button widget
+    self.widget = Button(root, command=self.toggle)
+    # update to reflect default state
+    self.__update__()
+    
+  def grid(self, row, col, colspan = 1, rowspan = 1):
+    self.widget.grid(row = row,
+                     column = col,
+                     rowspan = rowspan,
+                     columnspan = colspan,
+                     sticky = "nesw")
+    
+  def toggle(self):
+    self.state = not self.state
+    self.__update__()
+  
+  def __update__(self):
+    if(self.state):
+      self.widget.config( fg = self.colors[1],
+                          bg = self.colors[0],
+                          text = self.text[0])
+      debug(self.text[0])
+    else:
+      self.widget.config( fg = self.colors[0],
+                          bg = self.colors[1],
+                          text = self.text[1])
+      debug(self.text[1])
+
+# auto posterize toggle button
+posterize_toggle: Toggle = Toggle(text=("Posterizing", "NOT Posterizing"))
+posterize_toggle.grid(1,0)
+
+# toggle alpha mask button
+flatfield_toggle: Toggle = Toggle(text=("Using Flatfield", "NOT Using Flatfield"))
+flatfield_toggle.grid(1,1,colspan=2)
+
+# Main window: user interface
+class GUI:
+  # dict of all widgets present, key == name
+  widgets: dict = {}
+  # grid size
+  grid_size: tuple[int,int] = (0,0)
+  
+  
+  def __init__(self):
+    pass
+
+# Secondary window: projection screen
+class Projector:
+  pass
+    
+
 # get projector dimentions
 def win_size() -> tuple[int,int]:
   return (proj.winfo_width(), proj.winfo_height())
-
-# toggle alpha variable for projecting, return new status
-use_alpha: bool = False
-def toggle_alpha():
-  global use_alpha, alpha_button
-  use_alpha = not use_alpha
-  if(use_alpha):
-    alpha_button.config(bg="black", fg="white", text = 'using flat field')
-    debug("Flat field correction ENabled")
-  else:
-    alpha_button.config(bg="white", fg="black", text = 'NOT using flat field')
-    debug("Flat field correction DISabled")
-
-#toggle posterizing
-use_posterize: bool = False
-def toggle_posterize():
-  global use_posterize, posterize_button, pattern_img
-  use_posterize = not use_posterize
-  if(use_posterize):
-    posterize_button.config(bg="black", fg="white", text = 'posterizing')
-    set_pattern(query=False)
-    debug("auto posterizing ENabled")
-  else:
-    posterize_button.config(bg="white", fg="black", text = 'NOT posterizing')
-    debug("auto posterizing disabled")
-    
 
 # set alpha range if specified, returns alpha range
 last_alpha_used: tuple[int,int] = (0,0)
@@ -159,7 +202,7 @@ def set_pattern(query: bool = True):
     # resize to projector
     pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
-  if(use_posterize):
+  if(posterize_toggle.state):
     pattern_img = posterize(pattern_img)
   # delete previous button
   prev_pattern_button.destroy()
@@ -297,7 +340,7 @@ def __show_img(input_image: Image.Image):
     debug("resampling image for projection...")
     img_copy = img_copy.resize(fit_image(img_copy, window_size), Image.Resampling.LANCZOS)
   # apply alpha mask if enabled
-  if(use_alpha):
+  if(flatfield_toggle.state):
     # check if alpha has changed
     update_alpha_channel()
     if(img_copy.size != alpha_channel.size):
@@ -398,19 +441,6 @@ button.grid(
   column = 0,
   sticky='nesw')
 
-# auto posterize toggle button
-posterize_button: Button = Button(
-  root,
-  text = 'NOT posterizing',
-  fg = "black",
-  bg = "white",
-  command = toggle_posterize)
-posterize_button.grid(
-  row = 1,
-  column = 0,
-  sticky='nesw')
-
-
 # Show min_alpha field
 entry: Entry = Entry(
   root,
@@ -432,19 +462,6 @@ entry.grid(
   row = 0,
   column = 2,
   sticky = 'nesw')
-
-# toggle alpha mask button
-alpha_button: Button = Button(
-  root,
-  text = 'NOT using flat field',
-  fg = "black",
-  bg = "white",
-  command = toggle_alpha)
-alpha_button.grid(
-  row = 1,
-  column = 1,
-  columnspan = 2,
-  sticky='nesw')
 
 # Show IR focusing image button
 button: Button = Button(
