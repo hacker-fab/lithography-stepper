@@ -1,0 +1,50 @@
+Added Component: Designator=J?(FP-87438-1043-MFG)
+Add component (AddParameter): Name = "Color"; Value = "Natural"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Material"; Value = "Brass"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Plating"; Value = "Tin"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Contact Resistance"; Value = "40mR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Current Rating"; Value = "2.5A"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Flammability Rating"; Value = "UL94 V-0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Gender"; Value = "Male"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Glow Wire Compliant"; Value = "Non-compliant"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Color"; Value = "Beige"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Housing Material"; Value = "Thermoplastic"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Insulation Resistance"; Value = "1GR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Lead Free"; Value = "Contains Lead"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Lead Pitch"; Value = "1.5mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Material"; Value = "Nylon"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mating Cycles"; Value = "10"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Operating Temperature"; Value = "105°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Voltage Rating (AC)"; Value = "350V"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Operating Temperature"; Value = "-55°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Circuits"; Value = "10"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Contacts"; Value = "10"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Positions"; Value = "10"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Rows"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Orientation"; Value = "Right Angle"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "6000"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tape and Reel"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Pitch"; Value = "1.5mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Radiation Hardening"; Value = "No"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RoHS Compliant"; Value = "Yes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Series"; Value = "Pico-SPOX"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "SMD/SMT"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = "250V"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating (AC)"; Value = "350V"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating (DC)"; Value = "350V"; VariantName = "[No Variations]"
+Added Net: Name=NetD?_1
+Add Net: Net with name "NetD?_1" already exists
+Add Net: Net with name "NetD?_1" already exists
+Add Net: Net with name "NetD?_1" already exists
+Add Net: Net with name "NetD?_1" already exists
+Added Pin To Net: NetName=NetD?_2 Pin=J?-5
+Added Pin To Net: NetName=NetD?_2 Pin=J?-5
+Added Pin To Net: NetName=NetD?_2 Pin=J?-6
+Added Pin To Net: NetName=NetD?_2 Pin=J?-6
+Added Pin To Net: NetName=NetD?_2 Pin=J?-7
+Added Pin To Net: NetName=NetD?_2 Pin=J?-7
+Added Pin To Net: NetName=NetD?_2 Pin=J?-8
+Added Pin To Net: NetName=NetD?_2 Pin=J?-8
+Added Net: Name=NetD?_2
+Added Class: Name=UV_LED

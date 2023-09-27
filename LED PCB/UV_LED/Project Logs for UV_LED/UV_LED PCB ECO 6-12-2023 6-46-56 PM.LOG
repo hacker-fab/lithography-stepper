@@ -1,0 +1,20 @@
+Removed Pin From Net: NetName=NetJ?_1 Pin=UV LED-1
+Removed Pin From Net: NetName=NetJ?_5 Pin=UV LED-2
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 1-1
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 1-2
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 2-1
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 2-2
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 3-1
+Change Component Designator: OldDesignator=UV LED NewDesignator=LED 3-2
+Change Net Name : Old Net Name=NetUV LED_1 New Net Name=NetLED 1-1_1
+Added Pin To Net: NetName=NetLED 2-1_1 Pin=LED 2-1-1
+Added Pin To Net: NetName=NetLED 2-1_1 Pin=LED 2-2-2
+Added Net: Name=NetLED 2-1_1
+Added Pin To Net: NetName=NetLED 3-1_1 Pin=LED 3-1-1
+Added Pin To Net: NetName=NetLED 3-1_1 Pin=LED 3-2-2
+Added Net: Name=NetLED 3-1_1
+Added Member To Class: ClassName=UV_LED Member=Component LED 1-1 1A 3.2V
+Added Member To Class: ClassName=UV_LED Member=Component LED 1-2 1A 3.2V
+Added Member To Class: ClassName=UV_LED Member=Component LED 2-1 1A 3.2V
+Added Member To Class: ClassName=UV_LED Member=Component LED 2-2 1A 3.2V
+Added Member To Class: ClassName=UV_LED Member=Component LED 3-1 1A 3.2V

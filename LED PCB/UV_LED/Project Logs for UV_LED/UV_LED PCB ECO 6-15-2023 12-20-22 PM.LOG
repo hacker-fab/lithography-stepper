@@ -1,0 +1,5 @@
+Change Component Designator: OldDesignator= NewDesignator=LED 1-1
+Change Component Designator: OldDesignator=J? NewDesignator=CONN
+Change Net Name : Old Net Name=NetJ?_1 New Net Name=LED-
+Change Net Name : Old Net Name=NetJ?_5 New Net Name=LED+
+Added Member To Class: ClassName=UV_LED Member=Component LED 1-1 1A 3.2V
