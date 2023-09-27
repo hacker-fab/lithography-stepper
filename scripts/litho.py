@@ -19,8 +19,9 @@ root: Tk = Tk()
 # v1    working initial prototype
 # v2    added UV focus image option
 # v3    brightness correction implemented
-# v4    heavily refatored back end
-#   .1  
+# v4    begin refactoring backend
+#   .1  Better toggles
+
 root.title("Litho V4.1")
 
 # Text box at the bottom
