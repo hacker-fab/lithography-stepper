@@ -21,7 +21,8 @@ root: Tk = Tk()
 # v3    brightness correction implemented
 #   .1  fixed alpha updating bug
 #   .2  idiot-proofing and beautifying
-root.title("Litho V3.2")
+#   .3  added posterizing
+root.title("Litho V3.3")
 
 # Text box at the bottom
 debug_widget: Label = Label(
