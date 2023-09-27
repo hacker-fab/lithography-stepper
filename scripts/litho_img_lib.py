@@ -160,6 +160,17 @@ def apply_mask(input_image: Image.Image,
   # return image
   return background
 
+
+# actually posterize an image since pil.posterize doesn't work
+# optionally specify threashold
+def posterize(Input_image: Image.Image, threashold: int = 127) -> Image.Image:
+  output_image : Image.Image = Input_image.copy()
+  output_image = output_image.convert("L")
+  output_image = output_image.point( lambda p: 255 if p > 127 else 0 )
+  return output_image
+
+
+# automated test suite
 def __run_tests():
   def print_assert(a, b):
     if(a==b):

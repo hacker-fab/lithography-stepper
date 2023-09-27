@@ -2,20 +2,17 @@ from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, L
 from PIL import ImageTk, Image
 from time import sleep
 from os.path import basename
-from litho_img_lib import fit_image, convert_to_alpha_channel
+from litho_img_lib import fit_image, convert_to_alpha_channel, posterize
 
 # This code was written by Luca Garlati
 # it is intended for use in Hacker Fab
 # please credit on redistribution
 
 # TODO:
-# - auto convert images to monochrome
 # - add help popup window
-# - auto crop correction images
-# - add progress bar
-# - - Show progress when patterning
-# - - Show progress when generating mask
+# - auto crop amscope screenshots
 # - implement a proper error creation and handling system
+# - refactor this spaghetti
 
 # declare root tk object
 root: Tk = Tk()
@@ -142,11 +139,13 @@ def set_pattern(query: bool = True):
       debug("Pattern import cancelled")
     else:
       debug("Pattern set to "+basename(path))
-    # save the image
+    # copy the image
     pattern_img = Image.open(path).copy()
     # resize to projector
     pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
+    # make it monochrome
+    pattern_img = posterize(pattern_img)
   # delete previous button
   prev_pattern_button.destroy()
   # create thumbnail version
