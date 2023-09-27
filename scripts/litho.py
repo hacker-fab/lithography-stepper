@@ -59,6 +59,20 @@ def toggle_alpha():
     alpha_button.config(bg="white", fg="black", text = 'NOT using flat field')
     debug("Flat field correction DISabled")
 
+#toggle posterizing
+use_posterize: bool = False
+def toggle_posterize():
+  global use_posterize, posterize_button, pattern_img
+  use_posterize = not use_posterize
+  if(use_posterize):
+    posterize_button.config(bg="black", fg="white", text = 'posterizing')
+    set_pattern(query=False)
+    debug("auto posterizing ENabled")
+  else:
+    posterize_button.config(bg="white", fg="black", text = 'NOT posterizing')
+    debug("auto posterizing disabled")
+    
+
 # set alpha range if specified, returns alpha range
 last_alpha_used: tuple[int,int] = (0,0)
 def alpha_range(new_range: tuple[int,int] = (0,0)) -> tuple[int,int]:
@@ -145,7 +159,7 @@ def set_pattern(query: bool = True):
     # resize to projector
     pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
-    # make it monochrome
+  if(use_posterize):
     pattern_img = posterize(pattern_img)
   # delete previous button
   prev_pattern_button.destroy()
@@ -381,9 +395,21 @@ button: Button = Button(
   fg = 'white')
 button.grid(
   row = 0,
-  rowspan = 2,
   column = 0,
   sticky='nesw')
+
+# auto posterize toggle button
+posterize_button: Button = Button(
+  root,
+  text = 'NOT posterizing',
+  fg = "black",
+  bg = "white",
+  command = toggle_posterize)
+posterize_button.grid(
+  row = 1,
+  column = 0,
+  sticky='nesw')
+
 
 # Show min_alpha field
 entry: Entry = Entry(
