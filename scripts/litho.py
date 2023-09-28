@@ -3,16 +3,19 @@ from PIL import ImageTk, Image
 from time import sleep
 from os.path import basename
 from litho_img_lib import fit_image, convert_to_alpha_channel, posterize
+from litho_gui_lib import *
 
 # This code was written by Luca Garlati
 # it is intended for use in Hacker Fab
 # please credit on redistribution
 
 # TODO:
-# - add help popup window
-# - auto crop amscope screenshots
-# - implement a proper error creation and handling system
-# - refactor this spaghetti
+# add help popup window
+# auto crop amscope screenshots
+# implement a proper error creation and handling system
+# refactor this spaghetti
+# use the image.point function for rescaling
+# allow toggling pattern without re-importing
 
 # declare root tk object
 root: Tk = Tk()
@@ -21,80 +24,32 @@ root: Tk = Tk()
 # v3    brightness correction implemented
 # v4    begin refactoring backend
 #   .1  Better toggles
+#   .2  Better debug
+#   
 
-root.title("Litho V4.1")
+root.title("Litho V4.2")
 
-# Text box at the bottom
-debug_widget: Label = Label(
-  root,
-  text = "test",
-  justify = 'left',
-  anchor = 'w'
-)
-debug_widget.grid(
-  row = 3,
-  column = 0,
-  columnspan = 4,
-  sticky='nesw'
-)
-
-def debug(text: str):
-  debug_widget.config(text = text+"\nMade by Luca Garlati")
-  print(text)
-  root.update()
+# debug box at the bottom
+debug: Debug = Debug(root)
+debug.grid(3, 0, colspan = 5)
 
 
-# creates toggle widget
-class Toggle():
-  # mandatory / main fields
-  widget: Button
-  state: bool
-  
-  # user-inputted fields
-  text: tuple[str,str]
-  colors: tuple[str,str]
-  
-  def __init__(self, text: tuple[str,str], 
-                     colors: tuple[str,str] = ("black", "white"), 
-                     initial_state:bool=False):
-    # set fields
-    self.text = text
-    self.colors = colors
-    self.state = initial_state
-    # create button widget
-    self.widget = Button(root, command=self.toggle)
-    # update to reflect default state
-    self.__update__()
-    
-  def grid(self, row, col, colspan = 1, rowspan = 1):
-    self.widget.grid(row = row,
-                     column = col,
-                     rowspan = rowspan,
-                     columnspan = colspan,
-                     sticky = "nesw")
-    
-  def toggle(self):
-    self.state = not self.state
-    self.__update__()
-  
-  def __update__(self):
-    if(self.state):
-      self.widget.config( fg = self.colors[1],
-                          bg = self.colors[0],
-                          text = self.text[0])
-      debug(self.text[0])
-    else:
-      self.widget.config( fg = self.colors[0],
-                          bg = self.colors[1],
-                          text = self.text[1])
-      debug(self.text[1])
+# posterizes pattern image
+def posterize_pattern() -> None:
+  global pattern_img
+  pattern_img = posterize(pattern_img)
+  debug.info("Posterized pattern")
 
-# auto posterize toggle button
-posterize_toggle: Toggle = Toggle(text=("Posterizing", "NOT Posterizing"))
+
+# posterize toggle button
+posterize_toggle: Toggle = Toggle(root, debug = debug,
+                                  text=("Posterizing", "NOT Posterizing"),
+                                  func_on_true=posterize_pattern)
 posterize_toggle.grid(1,0)
 
 # toggle alpha mask button
-flatfield_toggle: Toggle = Toggle(text=("Using Flatfield", "NOT Using Flatfield"))
+flatfield_toggle: Toggle = Toggle(root, debug = debug,
+                                  text=("Using Flatfield", "NOT Using Flatfield"))
 flatfield_toggle.grid(1,1,colspan=2)
 
 # Main window: user interface
@@ -130,7 +85,7 @@ def alpha_range(new_range: tuple[int,int] = (0,0)) -> tuple[int,int]:
           new_range[1] >= 0 and
           new_range[1] <= 255 and
           new_range[0] < new_range[1]):
-    debug("invalid alpha range: "+str(new_range))
+    debug.error("invalid alpha range: "+str(new_range))
     assert(False)
   #assign new value and return
   last_alpha_used = new_range
@@ -170,23 +125,23 @@ def update_alpha_channel(force:bool = False):
   alphas: tuple[int,int] = (min_alpha.get(), max_alpha.get())
   target_size: tuple[int,int] = fit_image(pattern_img, win_size())
   if(not force): 
-    debug("checking if mask needs updating...")
+    debug.info("checking if mask needs updating...")
   if (alpha_range() == alphas and 
       mask_img.size == target_size and 
       not force):
-    debug("skipped updating")
+    debug.info("skipped updating")
     return
   else:
-    debug("updating mask...")
+    debug.info("updating mask...")
     global alpha_channel, prev_mask_button
     #update alpha stuff
     alpha_range(alphas)
     alpha_channel = convert_to_alpha_channel(mask_img, new_scale=alpha_range(), target_size=target_size)
     prev_mask_button.image = auto_thumbnail(alpha_channel)
     prev_mask_button.config(image=prev_mask_button.image)
-    debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
+    debug.info("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     
-    
+
 prev_pattern_button: Button = Button()
 # set new pattern image
 def set_pattern(query: bool = True):
@@ -195,16 +150,16 @@ def set_pattern(query: bool = True):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      debug("Pattern import cancelled")
+      debug.warn("Pattern import cancelled")
     else:
-      debug("Pattern set to "+basename(path))
+      debug.info("Pattern set to "+basename(path))
     # copy the image
-    pattern_img = Image.open(path).copy()
+    pattern_img = (Image.open(path)).copy()
     # resize to projector
     pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
   if(posterize_toggle.state):
-    pattern_img = posterize(pattern_img)
+    posterize_pattern()
   # delete previous button
   prev_pattern_button.destroy()
   # create thumbnail version
@@ -232,11 +187,11 @@ def set_focusing(query: bool = True):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      debug("Red focus import cancelled")
+      debug.warn("Red focus import cancelled")
     else:
-      debug("Red focus set to "+basename(path))
+      debug.info("Red focus set to "+basename(path))
     # save the image
-    focus_img = Image.open(path).copy()
+    focus_img = (Image.open(path)).copy()
     # resize to projector
     focus_img = focus_img.resize(fit_image(focus_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
@@ -266,11 +221,11 @@ def set_uv_focus(query: bool = True):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(path == ''):
-      debug("UV focus import cancelled")
+      debug.warn("UV focus import cancelled")
     else:
-      debug("UV focus set to "+basename(path))
+      debug.info("UV focus set to "+basename(path))
     # save the image
-    uv_img = Image.open(path).copy()
+    uv_img = (Image.open(path)).copy()
     # resize to projector
     uv_img = uv_img.resize(fit_image(uv_img, win_size=win_size()),
                                      Image.Resampling.LANCZOS)
@@ -299,12 +254,14 @@ def set_mask(query: bool = True):
   if(query):
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
+    if(path == ''):
+      debug.warn("flatfield import cancelled")
+    else:
+      debug.info("faltfield set to "+basename(path))
     # save the image
-    mask_img = Image.open(path).copy()
+    mask_img = (Image.open(path)).copy()
   # create alpha channel using mask
-  debug("creating alpha channel mask...")
   update_alpha_channel(force=True)
-  debug("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
   # delete previous button
   prev_mask_button.destroy()
   # create thumbnail version
@@ -338,14 +295,14 @@ def __show_img(input_image: Image.Image):
   # resample if image isn't correct size
   if(img_copy.width != window_size[0] or
      img_copy.height != window_size[1]):
-    debug("resampling image for projection...")
+    debug.info("resampling image for projection...")
     img_copy = img_copy.resize(fit_image(img_copy, window_size), Image.Resampling.LANCZOS)
   # apply alpha mask if enabled
   if(flatfield_toggle.state):
     # check if alpha has changed
     update_alpha_channel()
     if(img_copy.size != alpha_channel.size):
-      debug("mismatch image sizes:\npattern: "+str(img_copy.size)+"\nmask: "+str(alpha_channel.size)+"\nproj: "+str((proj.winfo_width(),proj.winfo_height())))
+      debug.error("mismatch image sizes:\npattern: "+str(img_copy.size)+"\nmask: "+str(alpha_channel.size)+"\nproj: "+str((proj.winfo_width(),proj.winfo_height())))
       assert(False)
     img_copy.putalpha(alpha_channel)
   # destroy currently displayed image
@@ -367,13 +324,13 @@ def __hide_img():
 def begin_patterning():
   # check duration and alpha are valid
   if (duration.get() <= 0):
-    debug("duration = "+str(duration.get())+" < 0, aborting")
+    debug.error("duration = "+str(duration.get())+" < 0, aborting")
     return
   # prepare for patterning
   global is_patterning
   pattern_button.configure(bg="black")
   __show_img(pattern_img)
-  debug("Patterning for "+str(duration.get())+"ms...")
+  debug.info("Patterning for "+str(duration.get())+"ms...")
   # begin
   root.update()
   sleep(duration.get() / 1000)
@@ -381,24 +338,24 @@ def begin_patterning():
   __hide_img()
   pattern_button.configure(bg="red")
   root.update()
-  debug("Finished patterning")
+  debug.info("Finished patterning")
 
 # show patterning image
 def show_focusing():
   __show_img(focus_img)
-  debug("showing red focus pattern")
+  debug.info("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
   __show_img(uv_img)
-  debug("showing uv focus pattern")
+  debug.info("showing uv focus pattern")
   root.update()
 
 # wrapper for clear button
 def clear_image():
   __hide_img()
-  debug("Projector cleared")
+  debug.info("Projector cleared")
 
 ###########
 ### GUI ###
@@ -526,7 +483,6 @@ pattern_button.grid(
   sticky='nesw')
 
 
-
-debug("Debug info will be displayed here.")
+debug.info("Debug info will appear here")
 root.mainloop()
 
