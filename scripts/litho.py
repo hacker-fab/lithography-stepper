@@ -23,11 +23,13 @@ root: Tk = Tk()
 # v2    added UV focus image option
 # v3    brightness correction implemented
 # v4    begin refactoring backend
-#   .1  Better toggles
-#   .2  Better debug
-#   
+#   .1  Better Toggles
+#   .2  Better Debug
+#   .3  Betterer Toggles
+#   .4  Better Thumbnails
+#   .5  
 
-root.title("Litho V4.2")
+root.title("Litho V4.4")
 
 # debug box at the bottom
 debug: Debug = Debug(root)
@@ -106,8 +108,6 @@ proj.grid_rowconfigure(0, weight=1)
 # projector variables
 thumbnail_size: tuple[int,int] = (160,90)
 pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
-focus_img:     Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
-uv_img:        Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
 alpha_channel: Image.Image
 current_img:   Label = Label()
@@ -179,74 +179,17 @@ def set_pattern(query: bool = True):
     sticky='nesw')
   prev_pattern_button = button
 
-prev_focusing_button: Button = Button()
-# set new pattern image
-def set_focusing(query: bool = True):
-  global focus_img, prev_focusing_button
-  if(query):
-    # get image
-    path: str = filedialog.askopenfilename(title ='Open')
-    if(path == ''):
-      debug.warn("Red focus import cancelled")
-    else:
-      debug.info("Red focus set to "+basename(path))
-    # save the image
-    focus_img = (Image.open(path)).copy()
-    # resize to projector
-    focus_img = focus_img.resize(fit_image(focus_img, win_size=win_size()),
-                                     Image.Resampling.LANCZOS)
-  # delete previous button
-  prev_focusing_button.destroy()
-  # create thumbnail version
-  img = auto_thumbnail(focus_img)
-  # display image with button
-  button: Button = Button(
-    root,
-    image = img,
-    text = "Red Focus",
-    compound = "top",
-    command = set_focusing
-    )
-  button.image = img
-  button.grid(
-    row = 2,
-    column = 3,
-    sticky='nesw')
-  prev_focusing_button = button
+red_focus_thumb: Thumbnail = Thumbnail(root,
+                                       thumb_size=thumbnail_size,
+                                       text = "Red Focus",
+                                       debug = debug)
+red_focus_thumb.grid(2, 3)
 
-prev_uv_focus_button: Button = Button()
-def set_uv_focus(query: bool = True):
-  global uv_img, prev_uv_focus_button
-  if(query):
-    # get image
-    path: str = filedialog.askopenfilename(title ='Open')
-    if(path == ''):
-      debug.warn("UV focus import cancelled")
-    else:
-      debug.info("UV focus set to "+basename(path))
-    # save the image
-    uv_img = (Image.open(path)).copy()
-    # resize to projector
-    uv_img = uv_img.resize(fit_image(uv_img, win_size=win_size()),
-                                     Image.Resampling.LANCZOS)
-  # delete previous button
-  prev_uv_focus_button.destroy()
-  # create thumbnail version
-  img = auto_thumbnail(uv_img)
-  # display image with button
-  button: Button = Button(
-    root,
-    image = img,
-    text = "UV Focus",
-    compound = "top",
-    command = set_uv_focus
-    )
-  button.image = img
-  button.grid(
-    row = 2,
-    column = 4,
-    sticky='nesw')
-  prev_uv_focus_button = button
+UV_focus_thumb: Thumbnail = Thumbnail(root,
+                                      thumb_size=thumbnail_size,
+                                      text="UV Focus",
+                                      debug=debug)
+UV_focus_thumb.grid(2,4)
 
 prev_mask_button: Button = Button()
 def set_mask(query: bool = True):
@@ -342,13 +285,13 @@ def begin_patterning():
 
 # show patterning image
 def show_focusing():
-  __show_img(focus_img)
+  __show_img(red_focus_thumb.image)
   debug.info("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
-  __show_img(uv_img)
+  __show_img(UV_focus_thumb.image)
   debug.info("showing uv focus pattern")
   root.update()
 
@@ -383,8 +326,6 @@ root.grid_columnconfigure(4, weight=5)
 proj.update()
 # show default images
 set_pattern(False)
-set_focusing(False)
-set_uv_focus(False)
 set_mask(False)
 
 # clear images button
