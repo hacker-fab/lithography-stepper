@@ -1,0 +1,1 @@
+This directory contains the zip file for a transimpedance amplifier (TIA) PCB, as described here: https://www.electronics-lab.com/project/photo-diode-amplifier-visible-light-using-opa381-arduino-nano-shield/
