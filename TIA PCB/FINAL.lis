@@ -1,0 +1,179 @@
+Post Processor Report
+OrCAD FILE: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.MAX
+Mon Jul 06 22:31:39 2020
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.TOP
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.TOP:
+---------------------------------------------------------
+D10:  0.0500 SQUARE --       0 Draws,       8 Flashes
+D11:  0.0600 x 0.0160 OBLONG    -----       7 Flashes
+D12:  0.0600 x 0.0160 RECTANGLE -----       1 Flashes
+D13:  0.0630 x 0.0630 OBLONG    -----      37 Flashes
+D14:  0.0630 SQUARE --       0 Draws,       3 Flashes
+D15:  0.0800 ROUND  --       0 Draws,       2 Flashes
+D16:  0.0800 SQUARE --       0 Draws,       2 Flashes
+D17:  0.0590 x 0.0630 OBLONG    -----      29 Flashes
+D18:  0.0590 x 0.0787 RECTANGLE -----       1 Flashes
+D19:  0.0650 ROUND  --       0 Draws,      18 Flashes
+D20:  0.0650 SQUARE --       0 Draws,       2 Flashes
+D21:  0.0100 ROUND  --     112 Draws,       0 Flashes
+---------------------------------------------------------
+ 12 D-Codes      -----     112 Draws,     110 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.BOT
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.BOT:
+---------------------------------------------------------
+D13:  0.0630 x 0.0630 OBLONG    -----      37 Flashes
+D14:  0.0630 SQUARE --       0 Draws,       3 Flashes
+D15:  0.0800 ROUND  --       0 Draws,       2 Flashes
+D16:  0.0800 SQUARE --       0 Draws,       2 Flashes
+D17:  0.0590 x 0.0630 OBLONG    -----      29 Flashes
+D18:  0.0590 x 0.0787 RECTANGLE -----       1 Flashes
+D19:  0.0650 ROUND  --       0 Draws,      18 Flashes
+D20:  0.0650 SQUARE --       0 Draws,       2 Flashes
+D21:  0.0100 ROUND  --    3267 Draws,       0 Flashes
+D22:  0.0177 ROUND  --       0 Draws,       8 Flashes
+D23:  0.0250 ROUND  --      59 Draws,       0 Flashes
+D24:  0.0150 ROUND  --       2 Draws,       0 Flashes
+---------------------------------------------------------
+ 12 D-Codes      -----    3328 Draws,     102 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SMT
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SMT:
+---------------------------------------------------------
+D10:  0.0500 SQUARE --       0 Draws,       8 Flashes
+D11:  0.0600 x 0.0160 OBLONG    -----       7 Flashes
+D12:  0.0600 x 0.0160 RECTANGLE -----       1 Flashes
+D13:  0.0630 x 0.0630 OBLONG    -----      37 Flashes
+D14:  0.0630 SQUARE --       0 Draws,       3 Flashes
+D17:  0.0590 x 0.0630 OBLONG    -----      29 Flashes
+D18:  0.0590 x 0.0787 RECTANGLE -----       1 Flashes
+D19:  0.0650 ROUND  --       0 Draws,      18 Flashes
+D20:  0.0650 SQUARE --       0 Draws,       2 Flashes
+D25:  0.0900 ROUND  --       0 Draws,       2 Flashes
+D26:  0.0900 SQUARE --       0 Draws,       2 Flashes
+---------------------------------------------------------
+ 11 D-Codes      -----       0 Draws,     110 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SMB
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SMB:
+---------------------------------------------------------
+D13:  0.0630 x 0.0630 OBLONG    -----      37 Flashes
+D14:  0.0630 SQUARE --       0 Draws,       3 Flashes
+D17:  0.0590 x 0.0630 OBLONG    -----      29 Flashes
+D18:  0.0590 x 0.0787 RECTANGLE -----       1 Flashes
+D19:  0.0650 ROUND  --       0 Draws,      18 Flashes
+D20:  0.0650 SQUARE --       0 Draws,       2 Flashes
+D22:  0.0177 ROUND  --       0 Draws,       8 Flashes
+D25:  0.0900 ROUND  --       0 Draws,       2 Flashes
+D26:  0.0900 SQUARE --       0 Draws,       2 Flashes
+---------------------------------------------------------
+  9 D-Codes      -----       0 Draws,     102 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SST
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SST:
+---------------------------------------------------------
+D21:  0.0100 ROUND  --     295 Draws,       0 Flashes
+D27:  0.0118 ROUND  --      10 Draws,       0 Flashes
+D28:  0.0059 ROUND  --       3 Draws,       0 Flashes
+D29:  0.0079 ROUND  --      20 Draws,       0 Flashes
+D30:  0.0050 ROUND  --     827 Draws,       0 Flashes
+D31:  0.0039 ROUND  --      26 Draws,       0 Flashes
+D32:  0.0080 ROUND  --     150 Draws,       0 Flashes
+D33:  0.0047 ROUND  --      11 Draws,       0 Flashes
+D34:  0.0060 ROUND  --      25 Draws,       0 Flashes
+---------------------------------------------------------
+  9 D-Codes      -----    1367 Draws,       0 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SSB
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.SSB:
+---------------------------------------------------------
+D21:  0.0100 ROUND  --       5 Draws,       0 Flashes
+---------------------------------------------------------
+  1 D-Codes      -----       5 Draws,       0 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.AST
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.AST:
+---------------------------------------------------------
+D11:  0.0600 x 0.0160 OBLONG    -----       7 Flashes
+D12:  0.0600 x 0.0160 RECTANGLE -----       1 Flashes
+D21:  0.0100 ROUND  --       4 Draws,       0 Flashes
+---------------------------------------------------------
+  3 D-Codes      -----       4 Draws,       8 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.DRD
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.DRD:
+---------------------------------------------------------
+D21:  0.0100 ROUND  --    1026 Draws,       0 Flashes
+---------------------------------------------------------
+  1 D-Codes      -----    1026 Draws,       0 Flashes
+
+*********************************************************
+
+Output file: C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.FAB
+
+Aperture totals for C:\USERS\RAJ\DOCUMENTS\CATAGORIES\SENSORS, MODULES\OPA381 LIGHT SENSOR\EL\LAYOUT\FINAL.FAB:
+---------------------------------------------------------
+D21:  0.0100 ROUND  --       4 Draws,       0 Flashes
+---------------------------------------------------------
+  1 D-Codes      -----       4 Draws,       0 Flashes
+
+
+*********************************************************
+
+Aperture totals for entire project:
+---------------------------------------------------------
+D10:  0.0500 SQUARE --       0 Draws,      16 Flashes
+D11:  0.0600 x 0.0160 OBLONG    -----      21 Flashes
+D12:  0.0600 x 0.0160 RECTANGLE -----       3 Flashes
+D13:  0.0630 x 0.0630 OBLONG    -----     148 Flashes
+D14:  0.0630 SQUARE --       0 Draws,      12 Flashes
+D15:  0.0800 ROUND  --       0 Draws,       4 Flashes
+D16:  0.0800 SQUARE --       0 Draws,       4 Flashes
+D17:  0.0590 x 0.0630 OBLONG    -----     116 Flashes
+D18:  0.0590 x 0.0787 RECTANGLE -----       4 Flashes
+D19:  0.0650 ROUND  --       0 Draws,      72 Flashes
+D20:  0.0650 SQUARE --       0 Draws,       8 Flashes
+D21:  0.0100 ROUND  --    4713 Draws,       0 Flashes
+D22:  0.0177 ROUND  --       0 Draws,      16 Flashes
+D23:  0.0250 ROUND  --      59 Draws,       0 Flashes
+D24:  0.0150 ROUND  --       2 Draws,       0 Flashes
+D25:  0.0900 ROUND  --       0 Draws,       4 Flashes
+D26:  0.0900 SQUARE --       0 Draws,       4 Flashes
+D27:  0.0118 ROUND  --      10 Draws,       0 Flashes
+D28:  0.0059 ROUND  --       3 Draws,       0 Flashes
+D29:  0.0079 ROUND  --      20 Draws,       0 Flashes
+D30:  0.0050 ROUND  --     827 Draws,       0 Flashes
+D31:  0.0039 ROUND  --      26 Draws,       0 Flashes
+D32:  0.0080 ROUND  --     150 Draws,       0 Flashes
+D33:  0.0047 ROUND  --      11 Draws,       0 Flashes
+D34:  0.0060 ROUND  --      25 Draws,       0 Flashes
+---------------------------------------------------------
+ 25 D-Codes      -----    5846 Draws,     432 Flashes
+
+
+No warnings or errors.
