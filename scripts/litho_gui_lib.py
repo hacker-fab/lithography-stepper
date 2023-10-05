@@ -4,10 +4,17 @@ from time import sleep
 from os.path import basename
 from types import FunctionType
 from litho_img_lib import *
+from typing import Callable
+
 
 # TODO
 # auto thumbnail size based on widget dimentions
 # update thumbnail widget instead of rebuilding it
+# Overarching GUI class
+# Projector class? or something?
+# Better to detect when a processed image actually needs updating
+# check if resizing of thumbnails skip works
+
 
 # widget to display info, errors, warning, and text
 class Debug():
@@ -43,12 +50,13 @@ class Debug():
     self.__set_color__(self.warn_color)
     print("w "+text)
     
-  #show error in the debug widget
+  # show error in the debug widget
   def error(self, text:str):
     self.widget.config(text = text)
     self.__set_color__(self.err_color)
     print("e "+text)
   
+  # place widget on the grid
   def grid(self, row, col, colspan = 1, rowspan = 1):
     self.widget.grid(row = row,
                      column = col,
@@ -56,16 +64,17 @@ class Debug():
                      columnspan = colspan,
                      sticky = "nesw")
     
+  # set the text and background color
   def __set_color__(self, colors: tuple[str,str]):
     self.widget.config(fg = colors[0],
                        bg = colors[1])
+    
 
 # creates toggle widget
 class Toggle():
   # mandatory / main fields
   widget: Button
   state: bool
-  
   # user-inputted fields
   text: tuple[str,str]
   colors: tuple[str,str]
@@ -126,69 +135,35 @@ class Toggle():
       if(self.debug != None):
         self.debug.info(self.text[1])
 
-"""
-### please kill me, existance is suffering
-prev_focusing_button: Button = Button()
-def set_focusing(query: bool = True):
-  global focus_img, prev_focusing_button
-  if(query):
-    # get image
-    path: str = filedialog.askopenfilename(title ='Open')
-    if(path == ''):
-      debug.warn("Red focus import cancelled")
-    else:
-      debug.info("Red focus set to "+basename(path))
-    # save the image
-    focus_img = (Image.open(path)).copy()
-    # resize to projector
-    focus_img = focus_img.resize(fit_image(focus_img, win_size=win_size()),
-                                     Image.Resampling.LANCZOS)
-  # delete previous button
-  prev_focusing_button.destroy()
-  # create thumbnail version
-  img = auto_thumbnail(focus_img)
-  # display image with button
-  button: Button = Button(
-    root,
-    image = img,
-    text = "Red Focus",
-    compound = "top",
-    command = set_focusing
-    )
-  button.image = img
-  button.grid(
-    row = 2,
-    column = 3,
-    sticky='nesw')
-  prev_focusing_button = button
-  
-  # makes a photo thumbnail copy at specified size
-  def auto_thumbnail(image: Image.Image, size: tuple[int,int] = thumbnail_size) -> ImageTk.PhotoImage:
-    thumb: Image.Image = image.copy()
-    thumb.thumbnail(size, Image.Resampling.LANCZOS)
-    return ImageTk.PhotoImage(thumb)
-### stop the genocide, enough has been lost 
-"""
-
-
 # creates thumbnail / image import widget
+# supports image processing with a few notes:
+# - the processing function is optional
+# - the function must take an image and return an image
+# - the widget will always reprocessing an image regardless of necessity, this
+#   should be handled by the function itself
+# - the widget won't auto-update the processed image upon function or external
+#   variable changes, this should be managed by the widget handler
 class Thumbnail():
   widget: Button
   # image stuff
-  image: Image.Image
+  original_img: Image.Image
+  processed_img: Image.Image
   thumb_size: tuple[int, int]
   # optional fields
   text: str
   debug: Debug | None
+  func: Callable[[Image.Image], Image.Image] | None
   
   def __init__(self, root: Tk,
                thumb_size: tuple[int,int],
                text: str = "",
-               debug: Debug | None = None):
+               debug: Debug | None = None,
+               func: Callable[[Image.Image], Image.Image] | None = None):
     # assign vars
     self.thumb_size = thumb_size
     self.text = text
     self.debug = debug
+    self.func = func
     # build widget
     button: Button = Button(
       root,
@@ -200,7 +175,7 @@ class Thumbnail():
     self.widget = button
     # create placeholder images
     placeholder = Image.new("RGB", self.thumb_size)
-    self.image = placeholder
+    self.original_img = placeholder
     self.update_thumbnail(placeholder)
   
   # prompt user for a new image
@@ -213,17 +188,33 @@ class Thumbnail():
       else:
         self.debug.info(self.text+" set to "+basename(path))
     # save the image
-    self.image = (Image.open(path)).copy()
-    # update thumbnail
-    self.update_thumbnail(self.image)
+    self.original_img = (Image.open(path)).copy()
+    # update
+    self.update()
     
   # update the thumbnail, but not original image
   def update_thumbnail(self, new_image: Image.Image):
-    thumb_img = new_image.resize(fit_image(self.image, win_size=self.thumb_size), Image.Resampling.LANCZOS)
+    new_size: tuple[int, int] = fit_image(new_image, win_size=self.thumb_size)
+    if(new_size != new_image.size):
+      thumb_img = new_image.resize(new_size, Image.Resampling.LANCZOS)
+    else:
+      thumb_img = new_image
     photoImage = ImageTk.PhotoImage(thumb_img)
     self.widget.config(image = photoImage)
     self.widget.image = photoImage
-    
+  
+  # update processed image and thumbnail using specified function
+  # setting update_func to true will also update the function for future imports
+  # to disable processing permanently, call with None:
+  #   self.process_image(func = None, update_func = True)
+  def process_image(self, func: Callable[[Image.Image], Image.Image] | None,
+                    update_func: bool = False):
+    if(update_func):
+      self.func = func
+    if(func != None):
+      self.processed_img = func(self.original_img)
+      self.update_thumbnail(self.processed_img)
+  
   # place widget on the grid
   def grid(self, row, col, colspan = 1, rowspan = 1):
     self.widget.grid(row = row,
@@ -231,6 +222,16 @@ class Thumbnail():
                      rowspan = rowspan,
                      columnspan = colspan,
                      sticky = "nesw")
-  
+
+  # updates various parts of the widget:
+  # - reprocess image with stored function
+  # - update thumbnail
+  def update(self):
+    if(self.func != None):
+      self.processed_img = self.func(self.original_img)
+      self.update_thumbnail(self.processed_img)
+    else:
+      self.update_thumbnail(self.original_img)
+
 
   

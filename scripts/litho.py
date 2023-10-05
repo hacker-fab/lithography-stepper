@@ -37,38 +37,21 @@ debug.grid(3, 0, colspan = 5)
 
 
 # posterizes pattern image
-def posterize_pattern() -> None:
-  global pattern_img
-  pattern_img = posterize(pattern_img)
-  debug.info("Posterized pattern")
+# def posterize_pattern() -> None:
+#   global pattern_img
+#   pattern_img = posterize(pattern_img)
+#   debug.info("Posterized pattern")
 
 
 # posterize toggle button
 posterize_toggle: Toggle = Toggle(root, debug = debug,
-                                  text=("Posterizing", "NOT Posterizing"),
-                                  func_on_true=posterize_pattern)
+                                  text=("Posterizing", "NOT Posterizing"))
 posterize_toggle.grid(1,0)
 
 # toggle alpha mask button
 flatfield_toggle: Toggle = Toggle(root, debug = debug,
                                   text=("Using Flatfield", "NOT Using Flatfield"))
 flatfield_toggle.grid(1,1,colspan=2)
-
-# Main window: user interface
-class GUI:
-  # dict of all widgets present, key == name
-  widgets: dict = {}
-  # grid size
-  grid_size: tuple[int,int] = (0,0)
-  
-  
-  def __init__(self):
-    pass
-
-# Secondary window: projection screen
-class Projector:
-  pass
-    
 
 # get projector dimentions
 def win_size() -> tuple[int,int]:
@@ -107,7 +90,7 @@ proj.grid_rowconfigure(0, weight=1)
 
 # projector variables
 thumbnail_size: tuple[int,int] = (160,90)
-pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
+# pattern_img:   Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,255))
 mask_img:      Image.Image = Image.new('RGBA', thumbnail_size, (0,0,0,0))
 alpha_channel: Image.Image
 current_img:   Label = Label()
@@ -123,7 +106,7 @@ def update_alpha_channel(force:bool = False):
   global alpha_channel
   # if we don't need to update, then we already know it's good (recursive assurance)
   alphas: tuple[int,int] = (min_alpha.get(), max_alpha.get())
-  target_size: tuple[int,int] = fit_image(pattern_img, win_size())
+  target_size: tuple[int,int] = fit_image(pattern_thumb.processed_img, win_size())
   if(not force): 
     debug.info("checking if mask needs updating...")
   if (alpha_range() == alphas and 
@@ -142,53 +125,76 @@ def update_alpha_channel(force:bool = False):
     debug.info("finished building "+str(proj.winfo_width())+"x"+str(proj.winfo_height())+" with "+str(alpha_range())+" alpha channel mask")
     
 
-prev_pattern_button: Button = Button()
-# set new pattern image
-def set_pattern(query: bool = True):
-  global pattern_img, prev_pattern_button
-  if(query):
-    # get image
-    path: str = filedialog.askopenfilename(title ='Open')
-    if(path == ''):
-      debug.warn("Pattern import cancelled")
-    else:
-      debug.info("Pattern set to "+basename(path))
-    # copy the image
-    pattern_img = (Image.open(path)).copy()
-    # resize to projector
-    pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
-                                     Image.Resampling.LANCZOS)
-  if(posterize_toggle.state):
-    posterize_pattern()
-  # delete previous button
-  prev_pattern_button.destroy()
-  # create thumbnail version
-  img = auto_thumbnail(pattern_img)
-  # display image with button
-  button: Button = Button(
-    root,
-    image = img,
-    text = "Pattern",
-    compound = "top",
-    command = set_pattern
-    )
-  button.image = img
-  button.grid(
-    row = 2,
-    column = 0,
-    sticky='nesw')
-  prev_pattern_button = button
+# prev_pattern_button: Button = Button()
+# # set new pattern image
+# def set_pattern(query: bool = True):
+#   global pattern_img, prev_pattern_button
+#   if(query):
+#     # get image
+#     path: str = filedialog.askopenfilename(title ='Open')
+#     if(path == ''):
+#       debug.warn("Pattern import cancelled")
+#     else:
+#       debug.info("Pattern set to "+basename(path))
+#     # copy the image
+#     pattern_img = (Image.open(path)).copy()
+#     # resize to projector
+#     pattern_img = pattern_img.resize(fit_image(pattern_img, win_size=win_size()),
+#                                      Image.Resampling.LANCZOS)
+#   if(posterize_toggle.state):
+#     posterize_pattern()
+#   # delete previous button
+#   prev_pattern_button.destroy()
+#   # create thumbnail version
+#   img = auto_thumbnail(pattern_img)
+#   # display image with button
+#   button: Button = Button(
+#     root,
+#     image = img,
+#     text = "Pattern",
+#     compound = "top",
+#     command = set_pattern
+#     )
+#   button.image = img
+#   button.grid(
+#     row = 2,
+#     column = 0,
+#     sticky='nesw')
+#   prev_pattern_button = button
 
-red_focus_thumb: Thumbnail = Thumbnail(root,
-                                       thumb_size=thumbnail_size,
-                                       text = "Red Focus",
-                                       debug = debug)
+
+# will process the input image based on the current settings:
+#   posterize
+#   flatfield
+def pattern_processing_func(input_image: Image.Image) -> Image.Image:
+  output_image: Image.Image = input_image.copy()
+  if(posterize_toggle.state and output_image.mode != 'L'):
+    output_image = posterize(output_image)
+  if(flatfield_toggle.state):
+    update_alpha_channel()
+    output_image.putalpha(alpha_channel)
+  return output_image
+
+pattern_thumb: Thumbnail = Thumbnail(
+  root,
+  thumb_size=thumbnail_size,
+  text = "Pattern",
+  debug = debug,
+  func = pattern_processing_func)
+pattern_thumb.grid(2, 0)
+
+red_focus_thumb: Thumbnail = Thumbnail(
+  root,
+  thumb_size=thumbnail_size,
+  text = "Red Focus",
+  debug = debug)
 red_focus_thumb.grid(2, 3)
 
-UV_focus_thumb: Thumbnail = Thumbnail(root,
-                                      thumb_size=thumbnail_size,
-                                      text="UV Focus",
-                                      debug=debug)
+UV_focus_thumb: Thumbnail = Thumbnail(
+  root,
+  thumb_size=thumbnail_size,
+  text="UV Focus",
+  debug=debug)
 UV_focus_thumb.grid(2,4)
 
 prev_mask_button: Button = Button()
@@ -272,7 +278,7 @@ def begin_patterning():
   # prepare for patterning
   global is_patterning
   pattern_button.configure(bg="black")
-  __show_img(pattern_img)
+  __show_img(pattern_thumb.processed_img)
   debug.info("Patterning for "+str(duration.get())+"ms...")
   # begin
   root.update()
@@ -285,13 +291,13 @@ def begin_patterning():
 
 # show patterning image
 def show_focusing():
-  __show_img(red_focus_thumb.image)
+  __show_img(red_focus_thumb.original_img)
   debug.info("showing red focus pattern")
   root.update()
 
 # show uv focusing image
 def show_uv_focus():
-  __show_img(UV_focus_thumb.image)
+  __show_img(UV_focus_thumb.original_img)
   debug.info("showing uv focus pattern")
   root.update()
 
@@ -325,7 +331,7 @@ root.grid_columnconfigure(4, weight=5)
   
 proj.update()
 # show default images
-set_pattern(False)
+# set_pattern(False)
 set_mask(False)
 
 # clear images button
