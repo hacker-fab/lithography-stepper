@@ -44,7 +44,7 @@ GUI.add_widget("red_focus_thumb", red_focus_thumb)
 
 uv_focus_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                       thumb_size=THUMBNAIL_SIZE,
-                                      text="uv Focus",
+                                      text="UV Focus",
                                       debug=debug)
 uv_focus_thumb.grid(2,4)
 GUI.add_widget("uv_focus_thumb", uv_focus_thumb)
@@ -105,7 +105,7 @@ GUI.add_widget("duration_intput", duration_intput)
 #region: clear button
 clear_button: Button = Button(
   GUI.root,
-  text = 'clear',
+  text = 'Clear',
   command = GUI.proj.clear,
   bg = 'black',
   fg = 'white')
@@ -142,7 +142,7 @@ def show_red_focus() -> None:
 
 red_focus_button: Button = Button(
   GUI.root,
-  text = 'show red focus',
+  text = 'Show Red Focus',
   command = show_red_focus)
 red_focus_button.grid(
   row = 0,
@@ -167,7 +167,7 @@ def show_uv_focus() -> None:
 
 uv_focus_button: Button = Button(
   GUI.root,
-  text = 'Show uv Focus',
+  text = 'Show UV Focus',
   command = show_uv_focus)
 uv_focus_button.grid(
   row = 0,

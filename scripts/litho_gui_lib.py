@@ -183,6 +183,9 @@ class Thumbnail():
     if(self.debug != None):
       if(path == ''):
         self.debug.warn(self.text+" import cancelled")
+      if(path[-4] != "." or not (path[-3:] == "jpg" or path[-3:] == "png")):
+        self.debug.error(self.text+" invalid file type: "+path[-3:])
+        return
       else:
         self.debug.info(self.text+" set to "+basename(path))
     img = Image.open(path)

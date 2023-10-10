@@ -178,7 +178,7 @@ def apply_mask(input_image: Image.Image,
 # actually posterize an image since pil.posterize doesn't work
 # optionally specify threashold
 def posterize(Input_image: Image.Image, threashold: int = 127) -> Image.Image:
-  output_image : Image.Image = Input_image.copy()
+  output_image: Image.Image = Input_image.copy()
   output_image = output_image.convert("L")
   output_image = output_image.point( lambda p: 255 if p > threashold else 0 )
   return output_image
