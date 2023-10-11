@@ -3,6 +3,7 @@ from tkinter import simpledialog
 import serial
 import threading
 import queue
+import time  # Import the time module
 
 class XYZController(tk.Tk):
     def __init__(self, queue, *args, **kwargs):
@@ -59,14 +60,28 @@ class XYZController(tk.Tk):
 def serial_worker(port, baudrate, q):
     try:
         ser = serial.Serial(port, baudrate)
+        ser.timeout = 1  # set read timeout
         while True:
             command = q.get(True)  # This will block until an item is available
+            print(f"Sending: {command.strip()}")  # print command being sent
             ser.write(command.encode('utf-8'))
+            
+            time.sleep(0.1)  # give some time for data to be received
+            
+            while ser.in_waiting:
+                response = ser.readline().decode('utf-8').strip()  # read a line from the serial port
+                if response:
+                    print(f"Received: {response}")
+
             q.task_done()
+
     except serial.SerialException as e:
         print(f"Could not open port {port}: {e}")
     except Exception as e:
         print(f"Exception in serial_worker: {e}")
+
+# ... [rest of the script remains unchanged]
+
 
 if __name__ == "__main__":
     serial_queue = queue.Queue()
