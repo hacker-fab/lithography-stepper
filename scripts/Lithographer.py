@@ -6,12 +6,12 @@ from litho_img_lib import *
 from litho_gui_lib import *
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
-
+CAMERA_FEED_SIZE: tuple[int, int] = (400, 300)
 
 #region: widgets
 
 # GUI Controller
-GUI: GUI_Controller = GUI_Controller(grid_size = (4,5),
+GUI: GUI_Controller = GUI_Controller(grid_size = (5,5),
                                      title = "Lithographer V1.0.0")
 
 # Debugger
@@ -116,6 +116,21 @@ clear_button.grid(
 GUI.add_widget("clear_button", clear_button)
 #endregion
 #region: red focus button
+
+#region: Camera feed
+camera_feed: Dynamic_Image = Dynamic_Image(
+  GUI.root,
+  name = 'CameraInput', 
+  size = CAMERA_FEED_SIZE
+)
+camera_feed.grid(
+  row = 4,
+  col = 0,
+  rowspan = 1,
+  colspan = 5
+)
+GUI.add_widget("camera_feed", camera_feed)
+#endregion
 
 # processing for showing red focus
 # posterizeing

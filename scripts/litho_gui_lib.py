@@ -138,6 +138,65 @@ class Toggle():
       if(self.debug != None):
         self.debug.info(self.text[1])
 
+#TODO implement debug, default image from path
+# an image that can be updated dynamically
+class Dynamic_Image():
+  widget: Label
+  image: Image.Image
+  size: tuple[int, int]
+
+  # optional fields
+  name: str
+  debug: Debug | None
+  default_image: Image.Image
+
+  def __init__(self, root: Tk,
+               size: tuple[int, int],
+               name: str = "Dynamic_Image",
+               debug: Debug | None = None,
+               default_image: Image.Image | str = None):
+    # assign vars
+    self.size = size
+    self.name = name
+    self.debug = debug
+
+    if(default_image == None):
+      self.default_image = Image.new("RGB", self.size)
+    elif(type(default_image) is str):
+      if(self.debug != None):
+        self.debug.error(self.name + " does not support file path input yet")
+    else:
+      self.default_image = default_image
+
+    self.image = default_image
+
+    # build widget
+    label : Label = Label(root, image=self.image)
+    self.widget = label
+
+    self.reset()
+
+  def reset(self):
+    self.update(self.default_image)
+
+  def update(self, new_image: Image.Image):
+    new_size: tuple[int, int] = fit_image(new_image, win_size=self.size)
+    if(new_size != new_image.size):
+      resized_img = new_image.resize(new_size, Image.Resampling.LANCZOS)
+    else:
+      resized_img = new_image
+    photoImage = rasterize(resized_img)
+    self.widget.config(image = photoImage)
+    self.widget.image = photoImage
+    
+  # place widget on the grid
+  def grid(self, row, col, colspan = 1, rowspan = 1):
+    self.widget.grid(row = row,
+                     column = col,
+                     rowspan = rowspan,
+                     columnspan = colspan,
+                     sticky = "nesw")
+
 # creates thumbnail / image import widget
 class Thumbnail():
   widget: Button
