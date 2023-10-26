@@ -5,6 +5,72 @@ from os.path import basename
 from litho_img_lib import *
 from litho_gui_lib import *
 
+import ctypes
+import pathlib
+import struct
+
+#region: C++ stepper library
+
+# utility/test functions
+
+def dataCallback(data_ptr):
+    global camera_feed
+
+    if(data_ptr is None):
+        print("[Py ] Error with callback data.")
+        return
+
+    unpacked = struct.unpack('iiiPiiPffff', data_ptr)
+
+    endianness = 'little'
+    ptr_size = 8
+
+    version = ctypes.c_int(int.from_bytes(data_ptr[0:4], byteorder=endianness)).value
+    live_width = ctypes.c_int(int.from_bytes(data_ptr[4:8], byteorder=endianness)).value
+    live_height = ctypes.c_int(int.from_bytes(data_ptr[8:12], byteorder=endianness)).value
+
+    version = unpacked(0)
+    live_width = unpacked(1)
+    live_height = unpacked(2)
+    live_data = unpacked(3)
+    still_width = unpacked(4)
+    still_height = unpacked(5)
+    still_data = unpacked(6)
+    stage_x = unpacked(7)
+    stage_y = unpacked(8)
+    stage_z = unpacked(9)
+    stage_theta = unpacked(10)
+    print(f"[Py ] Received updated data from C++: version={version}, ... , still_width={still_width}, still_height={still_height}, ...")
+
+    camera_feed.update(Image.from_bytes('RGB', (still_width, still_height), still_data, 'raw'))
+
+# main code
+
+# load the shared library in the build path 
+amcam_lib_path = pathlib.Path().absolute() / "lib" / "libamcam.so"
+amcam_lib = ctypes.CDLL(amcam_lib_path)
+lib_path = pathlib.Path().absolute() / "lib" / "steppercontrol.so"
+lib = ctypes.CDLL(lib_path)
+
+# configure library return types
+lib.testFromPy.restype = ctypes.c_float
+# lib.main.argtypes = ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)
+
+# call main to initialize library. starts a new thread dedicated for C++ execution
+main_argv = (ctypes.c_char_p * 2)(
+    ctypes.c_char_p("python_master.py".encode('utf-8')), 
+    ctypes.c_char_p(useNewThread.encode('utf-8'))
+)
+lib.main()
+
+# configure data forwarding from C++
+lib.setDataCallback(ctypes.CFUNCTYPE(None, ctypes.c_char_p)(dataCallback))
+
+# end the C++ thread
+# lib.exitCpp()
+
+#endregion
+
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 CAMERA_FEED_SIZE: tuple[int, int] = (400, 300)
 

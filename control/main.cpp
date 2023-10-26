@@ -1,26 +1,79 @@
 #include "config.hpp"
 
-#include "ControlInterface.hpp"
+//#include "ControlInterface.hpp"
 #include "cameramodule.hpp"
 #include "AmScopeCamera.hpp"
 
 //for testing purposes
 #include <iostream>
 #include <fstream>
+//cross-platform implementation
+#ifdef _WIN32
+#include <Windows.h>
+//TODO: #include windows pthread implementation
+#define SLEEP(x) Sleep(x)
+#else
+#include <pthread.h>
+#include <unistd.h>
+//#define SLEEP(x) do { struct timespec t; t.tv_sec = x / 1000; t.tv_nsec = x % 1000 * 1000000; nanosleep(&t, NULL); } while(0);
+#define SLEEP(x) sleep(1)
+#endif
+
+//global variables
+const int NUM_BUFFERS = 2;
+
+struct DataFormat {
+    uint32_t version;
+    uint32_t cameraLiveWidth;
+    uint32_t cameraLiveHeight;
+    uint8_t *cameraLiveData;
+    uint32_t cameraStillWidth;
+    uint32_t cameraStillHeight;
+    uint8_t *cameraStillData;
+    float stageX;
+    float stageY;
+    float stageZ;
+    float stageTheta;
+} dataBuffers[NUM_BUFFERS];
+
+int selectedBuffer;
 
 AmScopeCamera amscopeCamera;
 CameraModule *camera;
-uint8_t *cameraData;
+uint8_t *cameraLiveData;
+uint8_t *cameraStillData;
 
-void callback(uint8_t *img, int width, int height, CameraModule::ImageFormat fmt) {
-    for(int y = 0; y < height; y++) {
-        for(int x = 0; x < width; x++) {
-            cameraData[3*(y*width+x)] = img[3*(width*y+x)];
-            cameraData[3*(y*width+x)+1] = img[3*(width*y+x)+1];
-            cameraData[3*(y*width+x)+2] = img[3*(width*y+x)+2];
-        }
-    }
+void (*dataCallback)(char *data);
+bool shouldExit;
+int pthreadReturn;
 
+//external functions
+
+extern "C" void setDataCallback(void (*callback)(char *data)) {
+    dataCallback = callback;
+}
+
+extern "C" void exitCpp() {
+    shouldExit = true;
+}
+
+//internal functions
+
+void initializeBuffer(int index) {
+    dataBuffers[index].version = 1;
+    dataBuffers[index].cameraLiveWidth = 0;
+    dataBuffers[index].cameraLiveHeight = 0;
+    dataBuffers[index].cameraLiveData = nullptr;
+    dataBuffers[index].cameraStillWidth = 0;
+    dataBuffers[index].cameraStillHeight = 0;
+    dataBuffers[index].cameraStillData = nullptr;
+    dataBuffers[index].stageX = 0.0f;
+    dataBuffers[index].stageY = 0.0f;
+    dataBuffers[index].stageZ = 0.0f;
+    dataBuffers[index].stageTheta = 0.0f; 
+}
+
+void writeBitmapFile(uint8_t *img, int width, int height) {
     std::ofstream bitmap("/home/pi/camera-out.bmp", std::ios::out | std::ios::binary);
 
     //file header (see https://en.wikipedia.org/wiki/BMP_file_format, accessed 3 Oct 2023)
@@ -43,12 +96,9 @@ void callback(uint8_t *img, int width, int height, CameraModule::ImageFormat fmt
     *((int *)&bmpData[50]) = 0;
     *((short *)&bmpData[54]) = 0; //padding
 
-    int count = 0;
     for(int i = 0; i < 3 * width * height; i++) {
-        count += (cameraData[i] != 0);
-        bmpData[56+i] = cameraData[i];
+        bmpData[56+i] = img[i];
     }
-    std::cout << "count in main is " << count << std::endl;
 
     bitmap.write(bmpData, 14 + 40 + 2 + 3*width*height);
     bitmap.close();
@@ -56,10 +106,27 @@ void callback(uint8_t *img, int width, int height, CameraModule::ImageFormat fmt
     delete[] bmpData;
 }
 
+void stillImageCallback(uint8_t *img, int width, int height, CameraModule::ImageFormat fmt) {
+    //use a mutex?
+    for(int y = 0; y < height; y++) {
+        for(int x = 0; x < width; x++) {
+            cameraStillData[3*(y*width+x)] = img[3*(width*y+x)];
+            cameraStillData[3*(y*width+x)+1] = img[3*(width*y+x)+1];
+            cameraStillData[3*(y*width+x)+2] = img[3*(width*y+x)+2];
+        }
+    }
+
+    //place this here for now; later add functions to cameramodule:
+    dataBuffers[selectedBuffer].cameraStillWidth = width;
+    dataBuffers[selectedBuffer].cameraStillHeight = height;
+
+    //writeBitmapFile(cameraData, width, height);
+}
+
 void testCamera() {
     //camera test for V2
     camera = &amscopeCamera;
-    camera->setSingleCaptureCallback(callback);
+    camera->setSingleCaptureCallback(stillImageCallback);
 
     if(camera->isOpen()) {
         camera->closeCamera();
@@ -68,20 +135,84 @@ void testCamera() {
     if(camera->openCamera()) {
         camera->singleCapture();
     }
-
-    //camera->getSingleCaptureImage(cameraData, 6000, 4000, AmScopeCamera::RGB888);
 }
 
-int main(int argc, char *argv[])
-{
-    //V2 Camera test code
-    cameraData = new uint8_t[6000*4000*3];
+void swapBuffer() {
+    //select next buffer
+    selectedBuffer++;
+    selectedBuffer %= NUM_BUFFERS;
 
-    ControlInterface gui;
+    //swap all pointers
+    cameraLiveData = dataBuffers[selectedBuffer].cameraLiveData;
+    cameraStillData = dataBuffers[selectedBuffer].cameraStillData;
+}
 
-    std::cout << "If this message is already showing with the GUI open, then we're good. "
-                 "Otherwise, we should open the GUI in a separate thread and do some "
-                 "inter-process communication." << std::endl;
+void updateData() {
+    if(dataCallback) {
+        //get most recent data
 
-    return EXIT_SUCCESS;
+        //use a mutex?
+        dataCallback(reinterpret_cast<char *>(&dataBuffers[selectedBuffer]));
+        swapBuffer();
+    }
+}
+
+void *poll(void *data) {
+    while(!shouldExit) {
+        SLEEP(1);
+        updateData();
+    }
+
+    //exit
+    pthreadReturn = 0;
+    shouldExit = false;
+    pthread_exit(&pthreadReturn);
+}
+
+//entry point; also external
+
+/*
+int main(int argc, char *argv[]) {
+    //thread and data communication variables
+    pthread_t threadId;
+    shouldExit = false;
+    dataCallback = nullptr;
+
+    std::cout << "TEST0" << std::endl;
+    SLEEP(1000);
+
+    cameraLiveData = new uint8_t[3*3500*2500]; //TODO: proper size initialization
+    cameraStillData = new uint8_t[3*4500*3500]; //TODO: proper size initialization
+
+    for(int i = 0; i < NUM_BUFFERS; i++) {
+        initializeBuffer(i);
+    }
+    swapBuffer();
+
+    std::cout << "TEST1" << std::endl;
+    SLEEP(1000);
+
+    testCamera();
+    std::cout << "TEST2" << std::endl;
+    SLEEP(1000);
+
+    pthread_create(&threadId, nullptr, poll, nullptr);
+    std::cout << "TEST3" << std::endl;
+    SLEEP(1000);
+
+    while(!shouldExit) {
+        //TODO: command polling
+        //test:
+        camera->singleCapture();
+        SLEEP(500); //do this every half second
+    }
+
+    delete[] cameraLiveData;
+    delete[] cameraStillData;
+    return 0;
+}
+*/
+
+int main() {
+    return 0;
 }

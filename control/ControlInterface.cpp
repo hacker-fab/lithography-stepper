@@ -2,12 +2,17 @@
 #include "ControlInterface.hpp"
 #include <Python.h>
 
+#ifdef __linux__
+#include <pthread.h>
+#elif defined(_WIN32)
+//include windows pthreads
+#else
+//OS not supported
+#endif
+
 ControlInterface::ControlInterface() {
-    // Initialize the Python interpreter
     Py_Initialize();
-    // This is important as if you dont import sys and add current path to sys path, C can not locate python module.
     PyRun_SimpleString("import sys");
-    //PyRun_SimpleString("print('This is a test to see if python works')");
     // Add current path to sys path. Change path if needed.
     PyRun_SimpleString("sys.path.append('../scripts/')");
     // Import the Python module (dont add .py, just the name of your python module/script)
@@ -44,10 +49,8 @@ ControlInterface::ControlInterface() {
         Py_DECREF(pModule);
     } else {
         PyErr_Print();
-        DEBUG_OUTPUT("wewewewe");
     }
 
-    // Finalize the Python interpreter
     Py_Finalize();
 }
 
