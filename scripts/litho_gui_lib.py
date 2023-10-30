@@ -331,6 +331,7 @@ class Intput():
     # validate and update accordingly
     if(self.__validate__(new_val)):
       self.__value__ = new_val
+      self.var.set(new_val)
       self.widget.config(bg="white")
     else:
       if(self.auto_fix):

@@ -87,13 +87,23 @@ def center_crop(image: Image.Image, crop_size: tuple[int,int]) -> Image.Image:
 
 
 # return the max and min brightness values of an image
-def get_brightness_range(image: Image.Image) -> tuple[int,int]:
-  # first step is getting brightest and darkest pixel values
+# optionally specify downsampling target
+def get_brightness_range(image: Image.Image,
+                         downsample_target: int = 0) -> tuple[int,int]:
+  img_copy: Image.Image = image.copy()
+  # first make sure image is single channel
+  if(img_copy.mode != "L"):
+    img_copy = img_copy.convert("L")
+  # downsample if specified
+  if(downsample_target > 0):
+    while img_copy.width > downsample_target or img_copy.height > downsample_target:
+      img_copy = img_copy.resize((img_copy.width//2, img_copy.height//2), resample=Image.Resampling.LANCZOS)
+  # get brightness range
   brightness: list[int] = [255,0]
-  for col in range(image.width):
-    for row in range(image.height):
+  for col in range(img_copy.width):
+    for row in range(img_copy.height):
       # get single-value brightness since it's grayscale
-      pixel = image.getpixel((col, row))
+      pixel = img_copy.getpixel((col, row))
       if pixel < brightness[0]:
         brightness[0] = pixel
       if pixel > brightness[1]:
@@ -103,16 +113,11 @@ def get_brightness_range(image: Image.Image) -> tuple[int,int]:
 
 # returns a rescaled copy of an alpha mask
 # can be slow on larger images, only accepts L format images
-def rescale(image: Image.Image, new_scale: tuple[int,int],
-            force_brightness: tuple[int,int] | None = None) -> Image.Image:
+def rescale(image: Image.Image, new_scale: tuple[int,int]) -> Image.Image:
+  assert(image.mode == "L")
   mask: Image.Image = image.copy()
-  assert(mask.mode == "L")
   # first step is getting brightest and darkest pixel values
-  brightness: tuple[int,int]
-  if(force_brightness == None):
-    brightness = get_brightness_range(mask)
-  else:
-    brightness = force_brightness
+  brightness: tuple[int,int] = get_brightness_range(mask)
   # now rescale each pixel
   lut: dict = {}
   for col in range(mask.width):
@@ -132,8 +137,7 @@ def rescale(image: Image.Image, new_scale: tuple[int,int],
 def convert_to_alpha_channel(input_image: Image.Image,
                              new_scale: tuple[int,int] = (0,0),
                              target_size: tuple[int,int] = (0,0),
-                             downsample_target: int = 1080,
-                             force_brightness: tuple[int,int] | None = None) -> Image.Image:
+                             downsample_target: int = 1080) -> Image.Image:
   # copy the image
   mask: Image.Image = input_image.copy()
   # convert it to grayscale to normalize all values
@@ -149,14 +153,13 @@ def convert_to_alpha_channel(input_image: Image.Image,
     while mask.width > downsample_target or mask.height > downsample_target:
       mask = mask.resize((mask.width//2, mask.height//2), resample=Image.Resampling.LANCZOS)
     # rescale
-    mask = rescale(mask, new_scale, force_brightness = force_brightness)
+    mask = rescale(mask, new_scale)
     # resample to desired dimentions
     mask = center_crop(mask, target_size)
   elif (target_size != (0,0)):
     mask = center_crop(mask, target_size)
   # done
   return mask
-
 
 # return an alpha mask image applied to another image
 def apply_mask(input_image: Image.Image,

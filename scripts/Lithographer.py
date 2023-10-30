@@ -27,16 +27,17 @@ pattern_thumb: Thumbnail = Thumbnail(root=GUI.root,
 pattern_thumb.grid(2,0)
 GUI.add_widget("pattern_thumb", pattern_thumb)
 
+
 def guess_alpha():
-  guess: tuple[int,int] = get_brightness_range(flatfield_thumb.image)
-  return guess
-  
-  
+  guess: tuple[int,int] = get_brightness_range(flatfield_thumb.image, downsample_target=480)
+  min_alpha_intput.set(guess[1]-guess[0])  
+  max_alpha_intput.set(255)
 flatfield_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                         thumb_size=THUMBNAIL_SIZE,
                                         text="Flatfield",
                                         debug=debug,
-                                        accept_alpha=True)
+                                        accept_alpha=True,
+                                        func_on_success=guess_alpha)
 flatfield_thumb.grid(2,1, colspan=2)
 GUI.add_widget("flatfield_thumb", flatfield_thumb)
 
@@ -204,8 +205,8 @@ def show_pattern() -> None:
   
   # flatfield correction
   image = pattern_thumb.temp_image
-  if(flatfield_toggle.state and (image.mode == 'L' or image.mode == 'RGB') or 
-     min_alpha_intput.changed() or max_alpha_intput.changed()):
+  if(flatfield_toggle.state and (image.mode == 'L' or image.mode == 'RGB' or 
+     min_alpha_intput.changed() or max_alpha_intput.changed())):
     debug.info("Applying flatfield corretion...")
     alpha_channel = convert_to_alpha_channel(flatfield_thumb.image,
                                              new_scale=(min_alpha_intput.get(),max_alpha_intput.get()),
