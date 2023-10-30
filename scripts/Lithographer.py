@@ -182,14 +182,14 @@ uv_focus_button.grid(
   sticky='nesw')
 GUI.add_widget("uv_focus_button", uv_focus_button)
 #endregion
-#region: patterning button
+#region: patterning buttons
 
 # processing for patterning
 # posterizeing
 # flatfield correction
-# TODO check if can resize before flatfield
 # resizeing
-def show_pattern() -> None:
+# TODO check if can resize before flatfield
+def prep_pattern() -> None:
   # posterizeing
   image: Image.Image = pattern_thumb.temp_image
   if(posterize_toggle.state and not (image.mode == 'L' or image.mode == 'LA')):
@@ -228,22 +228,46 @@ def show_pattern() -> None:
   if(image.size != fit_image(image, GUI.proj.size())):
     debug.info("Resizing...")
     pattern_thumb.temp_image = image.resize(fit_image(image, GUI.proj.size()), Image.Resampling.LANCZOS)
+  
+# show pattern for specified duration
+def show_pattern_timed() -> None:
+  prep_pattern()
   debug.info("Patterning for " + str(duration_intput.get()) + "ms")
   GUI.proj.show(pattern_thumb.temp_image, duration=duration_intput.get())
   debug.info("Done")
 
-pattern_button: Button = Button(
+# show pattern until user presses clear
+def show_pattern_fixed() -> None:
+  prep_pattern()
+  debug.info("Patterning until clear")
+  GUI.proj.show(pattern_thumb.temp_image)
+  debug.info("Done")
+
+pattern_button_timed: Button = Button(
   GUI.root,
   text = 'Begin\nPatterning',
-  command = show_pattern,
+  command = show_pattern_timed,
   bg = 'red',
   fg = 'white')
-pattern_button.grid(
+pattern_button_timed.grid(
   row = 2,
-  rowspan = 2,
   column = 5,
   sticky='nesw')
-GUI.add_widget("pattern_button", pattern_button)
+GUI.add_widget("pattern_button_timed", pattern_button_timed)
+
+pattern_button_fixed: Button = Button(
+  GUI.root,
+  text = 'Show Pattern',
+  command = show_pattern_fixed,
+  bg = 'black',
+  fg = 'white')
+pattern_button_fixed.grid(
+  row = 3,
+  column = 5,
+  sticky='nesw')
+GUI.add_widget("pattern_button_fixed", pattern_button_fixed)
+
+
 #endregion
 #endregion
 
