@@ -104,15 +104,15 @@ def get_brightness_range(image: Image.Image) -> tuple[int,int]:
 # returns a rescaled copy of an alpha mask
 # can be slow on larger images, only accepts L format images
 def rescale(image: Image.Image, new_scale: tuple[int,int],
-            brightness_hint: tuple[int,int] | None = None) -> Image.Image:
+            force_brightness: tuple[int,int] | None = None) -> Image.Image:
   mask: Image.Image = image.copy()
   assert(mask.mode == "L")
   # first step is getting brightest and darkest pixel values
   brightness: tuple[int,int]
-  if(brightness_hint == None):
+  if(force_brightness == None):
     brightness = get_brightness_range(mask)
   else:
-    brightness = brightness_hint
+    brightness = force_brightness
   # now rescale each pixel
   lut: dict = {}
   for col in range(mask.width):
@@ -133,7 +133,7 @@ def convert_to_alpha_channel(input_image: Image.Image,
                              new_scale: tuple[int,int] = (0,0),
                              target_size: tuple[int,int] = (0,0),
                              downsample_target: int = 1080,
-                             brightness_hint: tuple[int,int] | None = None) -> Image.Image:
+                             force_brightness: tuple[int,int] | None = None) -> Image.Image:
   # copy the image
   mask: Image.Image = input_image.copy()
   # convert it to grayscale to normalize all values
@@ -149,7 +149,7 @@ def convert_to_alpha_channel(input_image: Image.Image,
     while mask.width > downsample_target or mask.height > downsample_target:
       mask = mask.resize((mask.width//2, mask.height//2), resample=Image.Resampling.LANCZOS)
     # rescale
-    mask = rescale(mask, new_scale, brightness_hint = brightness_hint)
+    mask = rescale(mask, new_scale, force_brightness = force_brightness)
     # resample to desired dimentions
     mask = center_crop(mask, target_size)
   elif (target_size != (0,0)):
@@ -183,6 +183,7 @@ def posterize(Input_image: Image.Image, threashold: int = 127) -> Image.Image:
   output_image = output_image.point( lambda p: 255 if p > threashold else 0 )
   return output_image
 
+
 # returns a copy of the input image without alpha channel
 def RGBA_to_RGB(image: Image.Image) -> Image.Image:
   assert(image.mode == "RGBA")
@@ -190,12 +191,14 @@ def RGBA_to_RGB(image: Image.Image) -> Image.Image:
   assert(len(channels)==4)
   return Image.merge("RGB", channels[0:3])
 
+
 # returns a copy of the input image without alpha channel
 def LA_to_L(image: Image.Image) -> Image.Image:
   assert(image.mode == "LA")
   channels: tuple[Image.Image,...] = image.split()
   assert(len(channels)==2)
   return Image.merge("L", [channels[0]])
+
 
 # This function is just a wrapper for ImageTk.PhotoImage() because of a bug
 # for whatever reason, photoimage removes the alpha channel from LA images
@@ -205,8 +208,7 @@ def rasterize(image: Image.Image) -> ImageTk.PhotoImage:
     return ImageTk.PhotoImage(image.convert("RGBA"))
   else:
     return ImageTk.PhotoImage(image)
-  
-  
+
 
 # automated test suite
 def __run_tests():

@@ -27,6 +27,11 @@ pattern_thumb: Thumbnail = Thumbnail(root=GUI.root,
 pattern_thumb.grid(2,0)
 GUI.add_widget("pattern_thumb", pattern_thumb)
 
+def guess_alpha():
+  guess: tuple[int,int] = get_brightness_range(flatfield_thumb.image)
+  return guess
+  
+  
 flatfield_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                         thumb_size=THUMBNAIL_SIZE,
                                         text="Flatfield",
@@ -180,23 +185,27 @@ GUI.add_widget("uv_focus_button", uv_focus_button)
 
 # processing for patterning
 # posterizeing
-# TODO flatfield correction
+# flatfield correction
 # TODO check if can resize before flatfield
 # resizeing
 def show_pattern() -> None:
   # posterizeing
   image: Image.Image = pattern_thumb.temp_image
-  if(posterize_toggle.state and (image.mode != 'L' or image.mode != 'LA')):
+  if(posterize_toggle.state and not (image.mode == 'L' or image.mode == 'LA')):
+    # posterizing enabled, and image isn't poterized
     debug.info("Posterizing...")
     pattern_thumb.temp_image = posterize(pattern_thumb.image)
     pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
   elif(not posterize_toggle.state and (image.mode == 'L' or image.mode == 'LA')):
-    debug.info("Resetting...")
+    # posterizing disabled, but image is posterized
+    debug.info("Resetting Posterizing...")
     pattern_thumb.temp_image = pattern_thumb.image
     pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
+  
   # flatfield correction
   image = pattern_thumb.temp_image
-  if(flatfield_toggle.state and (image.mode == 'L' or image.mode == 'RGB')):
+  if(flatfield_toggle.state and (image.mode == 'L' or image.mode == 'RGB') or 
+     min_alpha_intput.changed() or max_alpha_intput.changed()):
     debug.info("Applying flatfield corretion...")
     alpha_channel = convert_to_alpha_channel(flatfield_thumb.image,
                                              new_scale=(min_alpha_intput.get(),max_alpha_intput.get()),
@@ -259,5 +268,9 @@ GUI.mainloop()
 
 #endregion
 
+
+# pattern responds to both, obviously
+# show red posterizes if enabled, but not flatfield
+# UV doesn't respond to either
 
 

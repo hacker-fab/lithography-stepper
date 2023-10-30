@@ -148,6 +148,7 @@ class Thumbnail():
   text: str
   debug: Debug | None
   accept_alpha: bool
+  func_on_success: Callable | None
   # set to a copy of a new image upon import
   # useful to store a modified version of the original image
   temp_image: Image.Image
@@ -156,12 +157,14 @@ class Thumbnail():
                thumb_size: tuple[int,int],
                text: str = "",
                debug: Debug | None = None,
-               accept_alpha: bool = False):
+               accept_alpha: bool = False,
+               func_on_success: Callable | None = None):
     # assign vars
     self.thumb_size = thumb_size
     self.text = text
     self.debug = debug
     self.accept_alpha = accept_alpha
+    self.func_on_success = func_on_success
     # build widget
     button: Button = Button(
       root,
@@ -214,6 +217,9 @@ class Thumbnail():
     self.temp_image = self.image.copy()
     # update
     self.update_thumbnail(self.image)
+    # call optional func if specified
+    if(self.func_on_success != None):
+      self.func_on_success()
     
   # update the thumbnail, but not original image
   def update_thumbnail(self, new_image: Image.Image):
@@ -251,6 +257,8 @@ class Intput():
   extra_validation: Callable[[int], bool] | None
   # the value that will be returned: always valid
   __value__: int
+  # value checked by changed()
+  last_diff: int
   
   def __init__( self,
                 root: Tk,
@@ -276,6 +284,7 @@ class Intput():
     self.var = IntVar()
     self.var.set(default)
     self.value = self.min
+    self.last_diff = default
     # setup widget
     self.widget = Entry(root,
                         textvariable = self.var,
@@ -299,9 +308,27 @@ class Intput():
     return self.__value__
   
   
+  # try and set a new value
+  def set(self, user_value: int):
+    self.__update__(user_value)
+  
+  # has the value changed since the last time this method was called
+  def changed(self) -> bool:
+    if(self.get() != self.last_diff):
+      self.last_diff = self.get()
+      return True
+    return False
+    
+  
   # updates widget and value
-  def __update__(self):
-    new_val = self.var.get()
+  def __update__(self, new_value: int | None = None):
+    # get new potential value
+    new_val: int
+    if(new_value == None):
+      new_val = self.var.get()
+    else:
+      new_val = new_value
+    # validate and update accordingly
     if(self.__validate__(new_val)):
       self.__value__ = new_val
       self.widget.config(bg="white")
