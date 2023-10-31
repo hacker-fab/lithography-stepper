@@ -177,6 +177,7 @@ class Thumbnail():
     # create placeholder images
     placeholder = Image.new("RGB", self.thumb_size)
     self.image = placeholder
+    self.temp_image = placeholder.copy()
     self.update_thumbnail(placeholder)
   
   # prompt user for a new image
@@ -186,6 +187,7 @@ class Thumbnail():
     if(self.debug != None):
       if(path == ''):
         self.debug.warn(self.text+" import cancelled")
+        return
       if(path[-4] != "." or not (path[-3:] == "jpg" or path[-3:] == "png")):
         self.debug.error(self.text+" invalid file type: "+path[-3:])
         return
@@ -356,7 +358,6 @@ class Intput():
     return True
     
 
-# TODO Test this
 # creates a fullscreen window and displays specified images to it
 class Projector_Controller():
   ### Internal Fields ###
@@ -430,6 +431,64 @@ class Projector_Controller():
     self.__root__.update()
     self.__TL__.update()
 
+
+class TextPopup():
+  ### Internal Fields ###
+  __TL__: Toplevel
+  __label__: Label
+  __root__: Tk
+  widget: Button
+  ### User Fields ###
+  button_text: str
+  popup_text: str
+  
+  def __init__(self, root: Tk,
+               button_text: str = "",
+               popup_text: str = "",
+               title: str = "Popup"):
+    # assign vars
+    self.__root__ = root
+    self.button_text = button_text
+    self.popup_text = popup_text
+    self.title = title
+    # build button widget
+    button: Button = Button(
+      root,
+      command = self.show
+      )
+    if(button_text != ""):
+      button.config(text = button_text,
+                    compound = "top")
+    self.widget = button
+
+
+  #show the text popup
+  def show(self):
+    self.__TL__ = Toplevel(self.__root__)
+    self.__TL__.title(self.title)
+    self.__TL__.grid_columnconfigure(0, weight=1)
+    self.__TL__.grid_rowconfigure(0, weight=1)
+    self.__label__ = Label(self.__TL__, text=self.popup_text, justify="left")
+    self.__label__.grid(row=0,column=0,sticky="nesw")
+    self.update()
+
+  
+  # place widget on the grid
+  def grid(self, row, col, colspan = 1, rowspan = 1):
+    self.widget.grid(row = row,
+                     column = col,
+                     rowspan = rowspan,
+                     columnspan = colspan,
+                     sticky = "nesw")
+
+    
+  def update(self, new_text: str = ""):
+    if(new_text != ""):
+      self.text = new_text
+      self.__label__.config(text = new_text)
+    self.__root__.update()
+    self.__TL__.update()
+    
 
 # TODO add row and col weighting
 # TODO auto debug widget creation and application to children
