@@ -1,6 +1,8 @@
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from PIL.ImageOps import invert
+from math import ceil
+from random import randint
 
 # return max image size that will fit in [win_size] without cropping
 def fit_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
@@ -37,11 +39,10 @@ def fill_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
 # convert a value on one scale to the same location on another scale
 def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
     if(old_scale[0] == old_scale[1]):
-      if(value == old_scale[0]):
-        return new_scale[0]
-      else:
-        assert(value == old_scale[0])
-    assert(old_scale[0] < old_scale[1])
+      value = old_scale[0]
+    assert(old_scale[0] <= old_scale[1])
+    if(new_scale[0] == new_scale[1]):
+      return new_scale[0]
     assert(new_scale[0] < new_scale[1])
     # get % into the scale
     d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
@@ -135,7 +136,7 @@ def rescale(image: Image.Image, new_scale: tuple[int,int]) -> Image.Image:
 # optionally specify new scale
 # optionally specify new cropped size
 def convert_to_alpha_channel(input_image: Image.Image,
-                             new_scale: tuple[int,int] = (0,0),
+                             new_scale: tuple[int,int] | None = None,
                              target_size: tuple[int,int] = (0,0),
                              downsample_target: int = 1080) -> Image.Image:
   # copy the image
@@ -145,7 +146,7 @@ def convert_to_alpha_channel(input_image: Image.Image,
     mask = mask.convert("L")
   # Invert all colors since we want the mask, not the image itself
   mask = invert(mask)
-  if (new_scale!=(0,0)):
+  if (new_scale!=None):
     # if no target, save current size
     if (target_size == (0,0)):
       target_size = mask.size
@@ -213,13 +214,30 @@ def rasterize(image: Image.Image) -> ImageTk.PhotoImage:
     return ImageTk.PhotoImage(image)
 
 
+# convert from 0 to 100 intensity scale to tuple values
+# 0   = (255, 255)
+# 50  = (0,   255)
+# 100 = (0,   0)
+def dec_to_alpha(dec: int) -> tuple[int,int]:
+  if(dec < 0):
+    return (255,255)
+  if(dec <= 50):
+    return (255-ceil((255*dec)/50),255)
+  if(dec <= 100):
+    return (0,255-ceil((255*(dec-50))/50))
+  return (0,0)
+def alpha_to_dec(alpha: tuple[int,int]) -> int:
+  return int(((510-alpha[0]-alpha[1])*100)/510)
+
+
 # automated test suite
 def __run_tests():
-  def print_assert(a, b):
+  # will print a and b on fail
+  def print_assert(a, b, name: str = ""):
     if(a==b):
       assert(True)
     if(a!=b): 
-      print(a,"!=",b)
+      print(name,a,"!=",b)
       assert(False)
   dim0 = (50,200)
   dim1 = (150,100)
@@ -272,5 +290,20 @@ def __run_tests():
   
   # apply_mask(image, mask).show()
   
+  # (0,127) is incorrect, but should still work
+  alphas = [(0,0), (0, 127), (0, 255), (127, 255), (255,255)]
+  # correct conversions
+  decs = [100, 75, 50, 25, 0]
+  for i in range(len(alphas)):
+    print_assert(alpha_to_dec(alphas[i]), decs[i], str(i)+":0")
+    print_assert(dec_to_alpha(decs[i]), alphas[i], str(i)+":1")
+    print_assert(dec_to_alpha(alpha_to_dec(alphas[i])), alphas[i], str(i)+":2")
+    print_assert(alpha_to_dec(dec_to_alpha(decs[i])), decs[i], str(i)+":3")
+  # test every number, why not
+  for i in range(100):
+    print_assert(alpha_to_dec(dec_to_alpha(i)), i, str(i)+":4")
+    
   print("all tests passed")
 __run_tests()
+
+

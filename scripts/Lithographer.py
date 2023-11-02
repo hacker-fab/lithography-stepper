@@ -1,12 +1,10 @@
 from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label
 from PIL import ImageTk, Image
-from time import sleep
-from os.path import basename
 from litho_img_lib import *
 from litho_gui_lib import *
 
 # TODO: add a button to show pure white image for flatfield correction
-# TODO: fix bug where flatfield pattern is reapplied one second pattern show
+# TODO: fix bug where flatfield pattern is reapplied on second pattern show
 #       to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
@@ -15,7 +13,7 @@ THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 
 # GUI Controller
 GUI: GUI_Controller = GUI_Controller(grid_size = (4,5),
-                                     title = "Lithographer V1.0.0")
+                                     title = "Lithographer V1.2.1")
 
 # Debugger
 debug: Debug = Debug(root=GUI.root)
@@ -30,10 +28,10 @@ pattern_thumb: Thumbnail = Thumbnail(root=GUI.root,
 pattern_thumb.grid(2,0)
 GUI.add_widget("pattern_thumb", pattern_thumb)
 
-
+# return a guess for correction intensity, 0 to 50 %
 def guess_alpha():
-  guess: tuple[int,int] = get_brightness_range(flatfield_thumb.image, downsample_target=480)
-  FF_strength_intput.set(guess[1]-guess[0])  
+  brightness: tuple[int,int] = get_brightness_range(flatfield_thumb.image, downsample_target=480)
+  FF_strength_intput.set(round(((brightness[1]-brightness[0])*100)/510))
 flatfield_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                         thumb_size=THUMBNAIL_SIZE,
                                         text="Flatfield",
@@ -62,7 +60,7 @@ GUI.add_widget("uv_focus_thumb", uv_focus_thumb)
 posterize_toggle: Toggle = Toggle(root=GUI.root,
                                   text=("Now Posterizing","NOT Posterizing"),
                                   debug=debug)
-posterize_toggle.grid(0,1, colspan=2)
+posterize_toggle.grid(0,1)
 flatfield_toggle: Toggle = Toggle(root=GUI.root,
                                   text=("Using Flatfield","NOT Using Flatfield"),
                                   debug=debug)
@@ -70,25 +68,37 @@ flatfield_toggle.grid(1,1)
 #endregion
 
 #region: intput fields
-FF_strength_intput: Intput = Intput(root=GUI.root,
-                                  name="FF Strength",
-                                  default=0,
-                                  min = 0,
-                                  max = 255,
-                                  debug=debug,
-                                  auto_fix=False)
-FF_strength_intput.grid(1,2)
 
+FF_strength_intput: Intput = Intput(
+  root=GUI.root,
+  name="FF Strength",
+  default=0,
+  min = 0,
+  max = 100,
+  debug=debug)
+FF_strength_intput.grid(1,2)
 GUI.add_widget("FF_strength_intput", FF_strength_intput)
 
-duration_intput: Intput = Intput(root=GUI.root,
-                                         name="Pattern Duration",
-                                         default=1000,
-                                         min = 0,
-                                         max = 1000,
-                                         debug=debug)
+duration_intput: Intput = Intput(
+  root=GUI.root,
+  name="Pattern Duration",
+  default=1000,
+  min = 0,
+  debug=debug)
 duration_intput.grid(1,5)
 GUI.add_widget("duration_intput", duration_intput)
+
+post_strength_intput: Intput = Intput(
+  root=GUI.root,
+  name="Post Strength",
+  default=50,
+  min=0,
+  max=100,
+  debug=debug
+)
+post_strength_intput.grid(0,2)
+GUI.add_widget("post_strength_intput", post_strength_intput)
+
 #endregion
 
 #region: Buttons
@@ -115,9 +125,9 @@ def show_red_focus() -> None:
   debug.info("Showing red focus image")
   # posterizeing
   image: Image.Image = red_focus_thumb.temp_image
-  if(posterize_toggle.state and image.mode != 'L'):
+  if(posterize_toggle.state and (image.mode != 'L' or post_strength_intput.changed())):
     debug.info("Posterizing image...")
-    red_focus_thumb.temp_image = posterize(red_focus_thumb.temp_image)
+    red_focus_thumb.temp_image = posterize(red_focus_thumb.temp_image, round((post_strength_intput.get()*255)/100))
     red_focus_thumb.update_thumbnail(red_focus_thumb.temp_image)
   elif(not posterize_toggle.state and image.mode == 'L'):
     debug.info("Resetting image...")
@@ -176,10 +186,10 @@ GUI.add_widget("uv_focus_button", uv_focus_button)
 def prep_pattern() -> None:
   # posterizeing
   image: Image.Image = pattern_thumb.temp_image
-  if(posterize_toggle.state and not (image.mode == 'L' or image.mode == 'LA')):
+  if(posterize_toggle.state and ((not (image.mode == 'L' or image.mode == 'LA')) or post_strength_intput.changed())):
     # posterizing enabled, and image isn't poterized
     debug.info("Posterizing...")
-    pattern_thumb.temp_image = posterize(pattern_thumb.image)
+    pattern_thumb.temp_image = posterize(pattern_thumb.image, round((post_strength_intput.get()*255)/100))
     pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
   elif(not posterize_toggle.state and (image.mode == 'L' or image.mode == 'LA')):
     # posterizing disabled, but image is posterized
@@ -193,7 +203,7 @@ def prep_pattern() -> None:
      FF_strength_intput.changed())):
     debug.info("Applying flatfield corretion...")
     alpha_channel = convert_to_alpha_channel(flatfield_thumb.image,
-                                             new_scale=(FF_strength_intput.get(),255),
+                                             new_scale=dec_to_alpha(FF_strength_intput.get()),
                                              target_size=image.size,
                                              downsample_target=540)
     pattern_thumb.temp_image.putalpha(alpha_channel)
@@ -293,6 +303,10 @@ How do I use flatfield correction?
   - press the "use flatfield" button to toggle it
 4. Done, though some things to note
   - Flatfield correction will only be applied to the pattern, not red or uv focus
+  - The intensity of the correction is normalized from 0 to 100 for your convenience:
+    - 0   means no correction, ie completely transparent
+    - 50  means the correction is applied at full strength, from pure black pixels to pure white
+    - 100 means max correction, ie completely opaque
 
 
 Posterizer? I barely know her!
@@ -300,6 +314,17 @@ Posterizer? I barely know her!
 - What is posterizing?
   - Posterizing is the process for reducing the bit depth of an image.
   - For this GUI, it reduces the image to 1 bit depth or monochrome (not greyscale, only pure black and pure white)
+- What is that number next to it?
+  - The number next to the toggle is the cutoff value
+  - Unless you're losing features or lines are growing / shrinking, leave it at 50
+  - It behaves as follows:
+    - 100 is max cutoff, so only pure white will stay white
+    -  50 is default, light greys will be white, and dark greys will be black
+    -   0 is min cutoff, so only pure black will stay black
+- What does this apply to?
+  - Patterning image
+  - Red focus image
+  - NOT UV focus image because it would just be solid black
 - What does it actually do?
   - It makes all edges in the image perfectly sharp, improving the quality of the patterning.
   - It's unlikely, but you may not need to use it if:
