@@ -5,12 +5,11 @@ class CameraModule(ABC):
     class ImageFormat(Enum):
         RGB888 = auto()
 
+    # describes combinations of resolutions and image formats the camera supports
     class ResolutionMode:
         width = 0
         height = 0
-
-    class CameraImage:
-        imageformat = ImageFormat()
+        supportedFormats = None
 
     singleCaptureCallback = None
     streamCaptureCallback = None
@@ -27,69 +26,69 @@ class CameraModule(ABC):
 
     # camera configuration functions
     @abstractmethod
-    def getExposureTime():
+    def getExposureTime(self):
         pass
 
     @abstractmethod
-    def setExposureTime(micros):
+    def setExposureTime(self, micros):
         pass
     
     @abstractmethod
-    def getAvailableResolutionModes():
+    def getAvailableResolutionModes(self):
         pass # returns list of ResolutionModes
     
     @abstractmethod
-    def getResolutionMode():
+    def getResolutionMode(self):
         pass # returns current ResolutionMode
 
     @abstractmethod
-    def setResolutionMode(mode):
+    def setResolutionMode(self, mode):
         pass
 
     # other settings...
 
     # camera interfacing functions
     @abstractmethod
-    def liveImageReady(): # returns bool
+    def liveImageReady(self): # returns bool
         pass
 
     @abstractmethod
-    def stillImageReady(): # returns bool
+    def stillImageReady(self): # returns bool
         pass
         
     @abstractmethod
-    def isOpen(): # returns bool
+    def isOpen(self): # returns bool
         pass
 
     @abstractmethod
-    def openCamera(): # returns true on success
+    def open(self): # returns true on success
         pass
         
     @abstractmethod
-    def closeCamera(): # returns true on success
+    def close(self): # returns true on success
         pass
 
     @abstractmethod
-    def singleCapture(): # returns true on success
+    def singleCapture(self): # returns true on success
         pass
 
     @abstractmethod
-    def streamCapture(): # returns true on success
+    def streamCapture(self): # returns true on success
         pass
 
     # camera description functions
     @abstractmethod
-    def getDeviceVendor():
+    def getDeviceVendor(self):
         pass
 
     @abstractmethod
-    def getDeviceName():
+    def getDeviceName(self):
         pass
 
     @abstractmethod
-    def getSingleCaptureImage(int width, int height, ImageFormat fmt):
+    def getSingleCaptureImage(self, width, height, imageFormat):
         pass
 
     @abstractmethod
-    def getStreamCaptureImage(int width, int height, ImageFormat fmt):
+    def getStreamCaptureImage(self, width, height, imageFormat):
         pass

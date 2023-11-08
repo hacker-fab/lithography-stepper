@@ -1,5 +1,5 @@
 import camera_module
-import amscope_camera
+from amscope_camera import AmscopeCamera
 
 cameraModule = None
 
