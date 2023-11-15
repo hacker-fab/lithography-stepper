@@ -11,6 +11,12 @@ class CameraModule(ABC):
         height = 0
         supportedFormats = None
 
+        def __str__(self):
+            formatsString = ""
+            for f in self.supportedFormats:
+                formatsString += str(f) + ", "
+            return f"({self.width}, {self.height}, [{formatsString[:-2]}])"
+
     singleCaptureCallback = None
     streamCaptureCallback = None
 

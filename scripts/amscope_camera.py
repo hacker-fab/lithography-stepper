@@ -4,6 +4,7 @@
 
 from camera_module import *
 import amcam
+import time
 
 class AmscopeCamera(CameraModule):
 
@@ -62,9 +63,11 @@ class AmscopeCamera(CameraModule):
 
         self.camera.put_eSize(self.stillIndex)
         (self.stillWidth, self.stillHeight) = self.camera.get_Size()
+        self.stillData = bytes(self.stillWidth * self.stillHeight)
 
         self.camera.put_eSize(self.liveIndex)
         (self.liveWidth, self.liveHeight) = self.camera.get_Size()
+        self.liveData = bytes(self.liveWidth * self.liveHeight)
 
         # DEBUG("[CameraModule] Camera opened: live resolution %dx%d, still resolution %dx%d\n", \
         #       liveWidth, liveHeight, stillWidth, stillHeight)
@@ -95,13 +98,16 @@ class AmscopeCamera(CameraModule):
 
     def streamCapture(self):
         self.liveImageGood = False
-        self.camera.StartPullModeWithCallback(self.amscopeCallback, None)
+        self.camera.StartPullModeWithCallback(self.staticCallback, None)
 
         # DEBUG("[CameraModule] Waiting for live image...\n")
         return True
 
+    @staticmethod
+    def staticCallback(nEvent, ctx):
+        ctx.amscopeCallback(nEvent)
 
-    def amscopeCallback(nEvent):
+    def amscopeCallback(self, nEvent):
         if (nEvent == amcam.AMCAM_EVENT_IMAGE):
             self.liveImageGood = False
             self.camera.PullImageV2(self.liveData, 24, None)
@@ -185,13 +191,14 @@ class AmscopeCamera(CameraModule):
     def getAvailableResolutionModes(self):
         if self.__resolutionModes == None:
             num_resolutions = self.camera.ResolutionNumber()
-            self.__resolutionModes = [self.ResolutionMode()] * num_resolutions
+            self.__resolutionModes = [None] * num_resolutions
 
             for i in range(0, num_resolutions):
                 (w, h) = self.camera.get_Resolution(i)
+                self.__resolutionModes[i] = self.ResolutionMode()
                 self.__resolutionModes[i].width = w
                 self.__resolutionModes[i].height = h
-                self.__resolutionModes[i].supportedFormats = [RGB888]
+                self.__resolutionModes[i].supportedFormats = [self.ImageFormat.RGB888]
 
         return self.__resolutionModes
     
@@ -206,6 +213,10 @@ class AmscopeCamera(CameraModule):
                 self.stillIndex = i
                 self.liveIndex = i
                 self.camera.put_eSize(i)
+                self.stillData = bytes(mode.width * mode.height)
+                self.liveData = bytes(mode.width * mode.height)
+                self.stillImageGood = False
+                self.liveImageGood = False
                 return True
         return False
 
@@ -222,10 +233,69 @@ class AmscopeCamera(CameraModule):
 # test suite
 if __name__ == "__main__":
     def testCallback(data, width, height, format):
-        pass
-        
+        print(f"{width} {height} {format}")
+
+    def testCase(testName, expectedValues, actualValues):
+        global testCount
+        global testsPassed
+
+        errorStringLimit = 80
+
+        # convert inputs to lists if necessary
+        if not isinstance(expectedValues, list):
+            expectedValues = [expectedValues]
+        if not isinstance(actualValues, list):
+            actualValues = [actualValues]
+        assert len(expectedValues) == len(actualValues)
+
+        testCount += 1
+        success = True
+        errorString = "(expected, got) = ["
+
+        for i in range(0, len(expectedValues)):
+            if expectedValues[i] is not actualValues[i] or expectedValues[i] != actualValues[i]:
+                success = False
+                if(len(errorString) <= errorStringLimit):
+                    errorString += f"({expectedValues[i]}, {actualValues[i]}); "
+                if(len(errorString) > errorStringLimit):
+                    errorString = errorString[0:errorStringLimit] + "..."
+
+        if success:
+            testsPassed += 1
+            print("[AmscopeCamera] PASSED Test '" + testName + "'")
+        else:
+            errorString = errorString[:-2] + "]"
+            print("[AmscopeCamera] FAILED Test '" + testName + "': " + errorString)
+
+        return success
+
+
+    testCount = 0
+    testsPassed = 0
+
     camera = AmscopeCamera()
-    print("opened: " + str(camera.open()))
+    openSuccess = camera.open()
+    testCase("open()", True, openSuccess)
 
-    print(camera.getAvailableResolutionModes())
+    if not openSuccess:
+        print("[AmscopeCamera] Further testing requires connection to Amscope Camera")
+    else:
+        resolutions = camera.getAvailableResolutionModes()
+        print("[AmscopeCamera] Resolutions: ", end='')
 
+        expectedResolutionMode = []
+        actualResolutionMode = []
+        
+        for r in resolutions:
+            print(str(r) + " ", end='')
+            camera.setResolutionMode(r)
+            expectedResolutionMode.append(r)
+            actualResolutionMode.append(camera.getResolutionMode())
+        print()
+        testCase("setResolutionMode(ResolutionMode)", expectedResolutionMode, actualResolutionMode)
+
+    camera.setStreamCaptureCallback(testCallback)
+    camera.streamCapture()
+    time.sleep(5)
+
+    print(f"[AmscopeCamera] Result: {testsPassed}/{testCount} tests passed")

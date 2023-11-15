@@ -8,6 +8,10 @@ def callback(imageData, width, height, imageFormat):
     print(f"(w,y)=({width}, {height})")
     cameraModule.closeCamera()
 
+def cvTest():
+    pass
+
 cameraModule = AmscopeCamera()
-cameraModule.openCamera()
+cameraModule.open()
 cameraModule.setSingleCaptureCallback(callback)
+cameraModule.close()
