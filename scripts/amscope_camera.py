@@ -11,13 +11,9 @@ class AmscopeCamera(CameraModule):
     camera = None
 
     liveIndex = 0
-    liveWidth = 0
-    liveHeight = 0
     liveData = None
 
     stillIndex = 0
-    stillWidth = 0
-    stillHeight = 0
     stillData = None
 
     liveImageGood = False
@@ -50,27 +46,14 @@ class AmscopeCamera(CameraModule):
 
     def open(self):
         if self.isOpen():
-            # DEBUG("[CameraModule] Camera is already open\n")
             return True
 
         self.camera = amcam.Amcam.Open(None)
 
         if self.camera == None:
-            # DEBUG("[CameraModule] No camera found or open failed\n")
             return False
 
-        self.getAvailableResolutionModes()
-
-        self.camera.put_eSize(self.stillIndex)
-        (self.stillWidth, self.stillHeight) = self.camera.get_Size()
-        self.stillData = bytes(self.stillWidth * self.stillHeight)
-
-        self.camera.put_eSize(self.liveIndex)
-        (self.liveWidth, self.liveHeight) = self.camera.get_Size()
-        self.liveData = bytes(self.liveWidth * self.liveHeight)
-
-        # DEBUG("[CameraModule] Camera opened: live resolution %dx%d, still resolution %dx%d\n", \
-        #       liveWidth, liveHeight, stillWidth, stillHeight)
+        self.setResolutionMode(self.getAvailableResolutionModes()[0])
         return True
 
 
@@ -84,66 +67,61 @@ class AmscopeCamera(CameraModule):
         self.liveImageGood = False
         self.stillImageGood = False
 
-        # DEBUG("[CameraModule] Camera closed\n");
-
 
     def singleCapture(self):
         self.stillImageGood = False
-        self.camera.StartPullModeWithCallback(self.amscopeCallback, None)
+        self.camera.StartPullModeWithCallback(self.staticCallback, self)
         self.camera.Snap(self.stillIndex)
-
-        # DEBUG("[CameraModule] Waiting for still image...\n")
         return True
 
 
     def streamCapture(self):
         self.liveImageGood = False
-        self.camera.StartPullModeWithCallback(self.staticCallback, None)
-
-        # DEBUG("[CameraModule] Waiting for live image...\n")
+        self.camera.StartPullModeWithCallback(self.staticCallback, self)
         return True
+
 
     @staticmethod
     def staticCallback(nEvent, ctx):
         ctx.amscopeCallback(nEvent)
 
+
     def amscopeCallback(self, nEvent):
         if (nEvent == amcam.AMCAM_EVENT_IMAGE):
             self.liveImageGood = False
             self.camera.PullImageV2(self.liveData, 24, None)
-        
-            # DEBUG("[CameraModule] Live image captured.\n")
             self.liveImageGood = True
 
             if self.streamCaptureCallback != None:
-                self.streamCaptureCallback(self.liveData, self.liveWidth, self.liveHeight, self.ImageFormat.RGB888) # modify later
+                r = self.getResolutionMode()
+                self.streamCaptureCallback(self.liveData, r.width, r.height, self.ImageFormat.RGB888) # modify later
 
         elif nEvent == amcam.AMCAM_EVENT_STILLIMAGE:
             self.stillImageGood = False
             self.camera.PullStillImageV2(self.stillData, 24, None)
-        
-            # DEBUG("[CameraModule] Still image captured.\n")
             self.stillImageGood = True
 
             if self.singleCaptureCallback != None:
-                self.singleCaptureCallback(self.stillData, self.stillWidth, self.stillHeight, self.ImageFormat.RGB888) # modify later
+                r = self.getResolutionMode()
+                self.singleCaptureCallback(self.stillData, r.width, r.height, self.ImageFormat.RGB888) # modify later
 
         else: # for more robust operation, add more event handlers here
             pass
-            # DEBUG("[CameraModule] Other callback: %d\n", nEvent)
 
 
     def getSingleCaptureImage(img, width, height, imageFormat):
         if not self.stillImageReady():
             return None
-        self.__copyImage(self.stillData, img, self.stillWidth, self.stillHeight, width, height, imageFormat)
+        r = getResolutionMode()
+        self.__copyImage(self.stillData, img, r.width, r.height, width, height, imageFormat)
         return img
 
 
     def getStreamCaptureImage(imgData, width, height, imageFormat):
         if not self.liveImageReady():
             return None
-        __copyImage(self.liveData, img, self.liveWidth, self.liveHeight, width, height, imageFormat)
+        r = getResolutionMode()
+        __copyImage(self.liveData, img, r.width, r.height, width, height, imageFormat)
         return img
 
 
@@ -159,8 +137,6 @@ class AmscopeCamera(CameraModule):
     def __copyImage(srcData, destData, ws, hs, wd, hd, imageFormat):
         minWidth = ws if (ws < wd) else wd
         minHeight = hs if (hs < hd) else hd
-
-        # DEBUG("%d, %d\n", minWidth, minHeight)
 
         if True: # normally would check for format here; this assumes 24 bits per pixel
             # copy image data
@@ -185,8 +161,10 @@ class AmscopeCamera(CameraModule):
     def getExposureTime(self):
         pass
 
+
     def setExposureTime(self, micros):
         pass
+
     
     def getAvailableResolutionModes(self):
         if self.__resolutionModes == None:
@@ -238,8 +216,9 @@ if __name__ == "__main__":
     def testCase(testName, expectedValues, actualValues):
         global testCount
         global testsPassed
+        global testPrefixString
 
-        errorStringLimit = 80
+        errorStringLimit = 100
 
         # convert inputs to lists if necessary
         if not isinstance(expectedValues, list):
@@ -262,26 +241,33 @@ if __name__ == "__main__":
 
         if success:
             testsPassed += 1
-            print("[AmscopeCamera] PASSED Test '" + testName + "'")
+            print(testPrefixString + "PASSED Test '" + testName + "'")
         else:
-            errorString = errorString[:-2] + "]"
-            print("[AmscopeCamera] FAILED Test '" + testName + "': " + errorString)
+            if(len(errorString) > errorStringLimit):
+                errorString = errorString + "]"
+            else:
+                errorString = errorString[:-2] + "]"
+            print(testPrefixString + "FAILED Test '" + testName + "': " + errorString)
 
         return success
 
 
     testCount = 0
     testsPassed = 0
+    testPrefixString = "[AmscopeCamera] "
 
     camera = AmscopeCamera()
     openSuccess = camera.open()
     testCase("open()", True, openSuccess)
 
     if not openSuccess:
-        print("[AmscopeCamera] Further testing requires connection to Amscope Camera")
+        print(testPrefixString + "Further testing requires connection to Amscope Camera")
     else:
+        print(testPrefixString + camera.getDeviceName())
+        print(testPrefixString + camera.getDeviceVendor())
+        
         resolutions = camera.getAvailableResolutionModes()
-        print("[AmscopeCamera] Resolutions: ", end='')
+        print(testPrefixString + "Resolutions: ", end='')
 
         expectedResolutionMode = []
         actualResolutionMode = []
@@ -294,8 +280,8 @@ if __name__ == "__main__":
         print()
         testCase("setResolutionMode(ResolutionMode)", expectedResolutionMode, actualResolutionMode)
 
-    camera.setStreamCaptureCallback(testCallback)
-    camera.streamCapture()
-    time.sleep(5)
+        camera.setStreamCaptureCallback(testCallback)
+        camera.streamCapture()
+        time.sleep(5)
 
-    print(f"[AmscopeCamera] Result: {testsPassed}/{testCount} tests passed")
+    print(testPrefixString + f"Result: {testsPassed}/{testCount} tests passed")
