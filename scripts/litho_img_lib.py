@@ -1,8 +1,9 @@
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from PIL.ImageOps import invert
-from math import ceil
-from random import randint
+from math import ceil, cos, sin, radians
+from typing import Literal
+from math import pi
 
 # return max image size that will fit in [win_size] without cropping
 def fit_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
@@ -34,21 +35,6 @@ def fill_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
   else:
     # same ratio
     return win_size
-
-
-# convert a value on one scale to the same location on another scale
-def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
-    if(old_scale[0] == old_scale[1]):
-      value = old_scale[0]
-    assert(old_scale[0] <= old_scale[1])
-    if(new_scale[0] == new_scale[1]):
-      return new_scale[0]
-    assert(new_scale[0] < new_scale[1])
-    # get % into the scale
-    d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
-    # convert to second scale
-    return round((d * (new_scale[1]-new_scale[0])) + new_scale[0])
-
 
 # return a center cropped version of image at desired resolution
 # example: if size == window then this will fill and crop image to window
@@ -86,6 +72,20 @@ def center_crop(image: Image.Image, crop_size: tuple[int,int]) -> Image.Image:
   # done
   return cropped
 
+# convert a value on one scale to the same location on another scale
+def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
+    if(old_scale[0] == old_scale[1]):
+      value = old_scale[0]
+    assert(old_scale[0] <= old_scale[1])
+    if(new_scale[0] == new_scale[1]):
+      return new_scale[0]
+    assert(new_scale[0] < new_scale[1])
+    # get % into the scale
+    d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
+    # convert to second scale
+    return round((d * (new_scale[1]-new_scale[0])) + new_scale[0])
+
+# yeah would work but the 
 
 # return the max and min brightness values of an image
 # optionally specify downsampling target
@@ -229,8 +229,70 @@ def dec_to_alpha(dec: int) -> tuple[int,int]:
 def alpha_to_dec(alpha: tuple[int,int]) -> int:
   return int(((510-alpha[0]-alpha[1])*100)/510)
 
+# given an x, y, and theta transform, return tuple (a,b,c,d,e,f)
+# representing the following affine matrix
+# | a b c |
+# | d e f |
+# | 0 0 1 |
+# theta is a tuple of format (x distance to origin, y distance to origin, rotation in radians)
+def build_affine(x: float = 0, y: float = 0, theta: None | tuple[int,int,float] = None) -> tuple[float,...]:
+  if(theta == None or theta[2] == 0):
+    # nice, simple translation matrix :)
+    return (1, 0, x, 0, 1, y)
+  else:
+    # horribly ugly translation and rotation around center matrix :(
+    # in order, translate to origin, rotate, translate back, translate by xy
+    #{{Cos[θ], -Sin[θ], a - a Cos[θ] + x Cos[θ] + b Sin[θ] - y Sin[θ]}, {Sin[θ], Cos[θ], b - b Cos[θ] + y Cos[θ] - a Sin[θ] + x Sin[θ]}, {0, 0, 1}}
+    theta = (theta[0], theta[1], -theta[2])
+    dx: int = theta[0]
+    dy: int = theta[1]
+    r:  float = theta[2]
+    return (cos(r), -sin(r), dx - dx*cos(r) + x*cos(r) + dy*sin(r) - y*sin(r), sin(r), cos(r), dy - dy*cos(r) + y*cos(r) - dx*sin(r) + x*sin(r))
+
+# Summary:
+#   transforms input image by x, y, and theta within new output sized image with
+#   specified border size.
+# Inputs:
+#   [image] is the input image to be transformed
+#   [vector] is of format (x, y, theta) with x and y being in pixels and theta in *RADS*
+#   [output_size] is the size of the output image in pixels
+#   [border] is a percentage of output image size.
+#     Can specify distinct (x, y) percentages, or just one to apply to both. for a 100x100 image:
+#     0% border would be 100x100
+#     50% border would be 50x50 (25% off each side)
+#     100% border would display zero pixels of image
+def better_transform(image: Image.Image,
+                     vector: tuple[int, int, float],
+                     output_size: tuple[int,int],
+                     border: float
+                     ) -> Image.Image:
+  start = time()
+  final_image: Image.Image = Image.new("RGB", output_size)
+  img_cpy: Image.Image = image.copy()
+  
+  #region: prepare image
+  # if border is 100%, return a black image
+  if(border >= 100):
+    return final_image
+  # next we need to scale image to the requested size
+  inner_size: tuple[int,int] = (round(output_size[0]*(1-border)), 
+                                round(output_size[1]*(1-border)))
+  img_cpy = img_cpy.resize(inner_size, resample=Image.Resampling.LANCZOS)
+  #endregion
+
+  # first we want to compute the affine matrix to move the image to the center of the output
+  affine_matrix: tuple[float,...] = build_affine(-vector[0]-(output_size[0]-inner_size[0])//2,
+                                                 vector[1]-(output_size[1]-inner_size[1])//2,
+                                                (inner_size[0]//2, inner_size[1]//2, -vector[2]))
+  img_cpy = Image.Image.transform(img_cpy, output_size, Image.Transform.AFFINE, affine_matrix, resample=Image.Resampling.BICUBIC, fillcolor="black")
+  return img_cpy
+  
+
+#TODO write a function that will tell you if the vector is too large and will exit given borders, efficiently
+
 
 # automated test suite
+
 def __run_tests():
   # will print a and b on fail
   def print_assert(a, b, name: str = ""):
@@ -303,7 +365,29 @@ def __run_tests():
   for i in range(100):
     print_assert(alpha_to_dec(dec_to_alpha(i)), i, str(i)+":4")
     
-  print("all tests passed")
+  print("All tests passed")
 __run_tests()
+
+# performance benchmarks for transform
+if(False):
+  from time import time
+  from random import randint, random
+  import numpy
+  def __timing_tests(resolution: tuple[int,int], runs: int = 10):
+    print("Running",runs,"tests at",resolution,"...")
+    overall = time()
+    total = 0
+    for i in range(runs):
+      # img = Image.new("RGB", resolution, (randint(0,255),randint(0,255),randint(0,255)))
+      img = Image.fromarray((numpy.random.rand(resolution[0],resolution[1],3)*255).astype('uint8')).convert('RGB')
+      start = time()
+      better_transform(img, (randint(-resolution[0],resolution[0]),randint(-resolution[1],resolution[1]),random()*2*pi), resolution, random()*0.9)
+      total += time()-start
+    print("| finished in "+str(int(time()-overall))+"s")
+    print("| average of  "+str(int(total/runs*1000))+"ms")
+  print("Tranform timing tests:")
+  __timing_tests((1920,1080),50)
+  __timing_tests((2560,1440),50)
+  __timing_tests((3840,2160),50)
 
 
