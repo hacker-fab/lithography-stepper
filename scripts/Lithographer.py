@@ -26,7 +26,7 @@ THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 
 # GUI Controller
 GUI: GUI_Controller = GUI_Controller(grid_size = (5,6),
-                                     title = "Lithographer V1.2.1")
+                                     title = "Lithographer V1.2.3")
 # Debugger
 debug: Debug = Debug(root=GUI.root)
 debug.grid(4,0,colspan=5)
