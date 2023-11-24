@@ -1,23 +1,35 @@
-from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label
+from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label, ttk
+from tkinter.ttk import Progressbar
 from PIL import ImageTk, Image
 from litho_img_lib import *
 from litho_gui_lib import *
 
-# TODO: add a button to show pure white image for flatfield correction
-# TODO: fix bug where flatfield pattern is reapplied on second pattern show
-#       to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
+# TODO
+# text display (for current motor coordinates)
+# Dpad Buttons (moving the motors)
+# spot for "entire layer" image
+# spot for "c qurrent tile" image
+# 
+# Low Priority
+# - an image showing live camera output (I'll just set the image and it will update basically)
+# - CLI
+# - add a button to show pure white image for flatfield correction
+# - fix bug where flatfield pattern is reapplied on second pattern show
+#     to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
+# - Nonblocking patterning
+# 
+
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 
 #region: widgets
 
 # GUI Controller
-GUI: GUI_Controller = GUI_Controller(grid_size = (4,5),
+GUI: GUI_Controller = GUI_Controller(grid_size = (5,6),
                                      title = "Lithographer V1.2.1")
-
 # Debugger
 debug: Debug = Debug(root=GUI.root)
-debug.grid(3,0,colspan=5)
+debug.grid(4,0,colspan=5)
 GUI.add_widget("debug", debug)
 
 #region: Import thumbnails
@@ -119,7 +131,6 @@ GUI.add_widget("clear_button", clear_button)
 
 # processing for showing red focus
 # posterizeing
-# TODO flatfield correction
 # resizeing
 def show_red_focus() -> None:
   debug.info("Showing red focus image")
@@ -154,7 +165,6 @@ GUI.add_widget("red_focus_button", red_focus_button)
 #region: uv focus button
 
 # processing for showing uv focus
-# TODO flatfield correction
 # resizeing
 def show_uv_focus() -> None:
   debug.info("Showing uv focus image")
@@ -182,7 +192,6 @@ GUI.add_widget("uv_focus_button", uv_focus_button)
 # posterizeing
 # flatfield correction
 # resizeing
-# TODO check if can resize before flatfield
 def prep_pattern() -> None:
   # posterizeing
   image: Image.Image = pattern_thumb.temp_image
@@ -261,6 +270,7 @@ GUI.add_widget("pattern_button_fixed", pattern_button_fixed)
 #endregion
 
 #region: Text Fields
+
 #region: Duration
 duration_text: Label = Label(
   GUI.root,
@@ -275,6 +285,7 @@ duration_text.grid(
 )
 GUI.add_widget("duration_text", duration_text)
 #endregion
+
 #Region Help Popup
 
 help_text: str = """
@@ -349,7 +360,21 @@ help_popup: TextPopup = TextPopup(
   title="Help Popup",
   button_text="Help",
   popup_text=help_text)
-help_popup.grid(3,5)
+help_popup.grid(4,5)
+#endregion
+
+#region: progress bars
+pattern_progress: Progressbar = Progressbar(
+  GUI.root,
+  orient='horizontal',
+  mode='determinate',
+  )
+pattern_progress.grid(
+  row = 3,
+  column = 0,
+  columnspan = 6,
+  sticky='nesw')
+GUI.proj.progressbar = pattern_progress
 #endregion
 
 GUI.debug.info("Debug info will appear here")

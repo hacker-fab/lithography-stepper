@@ -1,19 +1,11 @@
 from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label, Widget
+from tkinter.ttk import Progressbar
 from PIL import ImageTk, Image
 from time import time
 from os.path import basename
-from types import FunctionType
 from litho_img_lib import *
 from typing import Callable, Literal
 
-
-# TODO
-# auto thumbnail size based on widget dimentions
-# update thumbnail widget instead of rebuilding it
-# Overarching GUI class
-# Projector class? or something?
-# Better to detect when a processed image actually needs updating
-# check if resizing of thumbnails skip works
 
 # widget to display info, errors, warning, and text
 class Debug():
@@ -242,7 +234,6 @@ class Thumbnail():
                      columnspan = colspan,
                      sticky = "nesw")
 
-#TODO add a recall / changed function for regenerating masks and stuff
 # creates a better int input field
 class Intput():
   widget: Entry
@@ -357,7 +348,6 @@ class Intput():
     # passed all checks
     return True
     
-
 # creates a fullscreen window and displays specified images to it
 class Projector_Controller():
   ### Internal Fields ###
@@ -368,6 +358,7 @@ class Projector_Controller():
   __clearImage__: ImageTk.PhotoImage
   ### optional user args ###
   debug: Debug | None
+  progressbar: Progressbar | None
   
   def __init__( self,
                 root: Tk,
@@ -405,12 +396,13 @@ class Projector_Controller():
     self.__label__.config(image = photo)
     self.__label__.image = photo
     if(duration > 0):
-      # prepare end in two steps for a more accurate duration
-      end: float = duration / 1000
-      end += time()
+      end = time() + duration / 1000
       # update and begin
       self.update()
       while(time() < end):
+        if(self.progressbar != None):
+          self.progressbar['value'] = 100 - ((end - time()) / duration * 100000)
+          self.__root__.update_idletasks()
         pass
       self.clear()
     else:
@@ -420,6 +412,8 @@ class Projector_Controller():
   def clear(self):
     self.__label__.config(image = self.__clearImage__)
     self.__label__.image = self.__clearImage__
+    if(self.progressbar != None):
+      self.progressbar['value'] = 0
     self.update()
 
   # get size of projector window
@@ -431,7 +425,7 @@ class Projector_Controller():
     self.__root__.update()
     self.__TL__.update()
 
-
+# creates a new window with specified text. Useful for a help menu
 class TextPopup():
   ### Internal Fields ###
   __TL__: Toplevel
@@ -488,9 +482,8 @@ class TextPopup():
       self.__label__.config(text = new_text)
     self.__root__.update()
     self.__TL__.update()
-    
 
-# TODO add row and col weighting
+# TODO auto adjust rows and cols when adding children
 # TODO auto debug widget creation and application to children
 # GUI controller and widget manager
 class GUI_Controller():
