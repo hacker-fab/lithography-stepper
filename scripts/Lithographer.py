@@ -5,10 +5,10 @@ from litho_img_lib import *
 from litho_gui_lib import *
 
 # TODO
-# text display (for current motor coordinates)
-# Dpad Buttons (moving the motors)
-# spot for "entire layer" image
-# spot for "current tile" image
+# - Keyboard input for moving stage
+# - spot for "entire layer" image
+# - spot for "current tile" image
+# - update the help message to include stage stuff
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -16,6 +16,9 @@ from litho_gui_lib import *
 # - add a button to show pure white image for flatfield correction
 # - fix bug where flatfield pattern is reapplied on second pattern show
 #     to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
+# - refactor widgets to be organized by category. see stage controls
+# - refactor grid location to be based off category offsets instead of asbolute for easier moving
+#     of widget groups. see stage controls
 # 
 
 
@@ -23,7 +26,7 @@ THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 
 # GUI Controller
 GUI: GUI_Controller = GUI_Controller(grid_size = (9,9),
-                                     title = "Lithographer V1.2.4",
+                                     title = "Lithographer V1.2.5",
                                      add_window_size=(0,300))
 # Debugger
 debug: Debug = Debug(root=GUI.root)
@@ -234,8 +237,11 @@ def prep_pattern() -> None:
 def show_pattern_timed() -> None:
   prep_pattern()
   debug.info("Patterning for " + str(duration_intput.get()) + "ms")
+  stage.lock()
   result = GUI.proj.show(pattern_thumb.temp_image, duration=duration_intput.get())
-  if(result): debug.info("Done")
+  if(result):
+    stage.unlock()
+    debug.info("Done")
 pattern_button_timed: Button = Button(
   GUI.root,
   text = 'Begin\nPatterning',
@@ -358,7 +364,8 @@ help_popup: TextPopup = TextPopup(
   root=GUI.root,
   title="Help Popup",
   button_text="Help",
-  popup_text=help_text)
+  popup_text=help_text,
+  debug=debug)
 help_popup.grid(8,5)
 #endregion
 
@@ -390,37 +397,126 @@ camera.grid(
 
 #region: Stage Control
 
-stage: Stage_Controller = Stage_Controller()
-#region: Buttons
+stage: Stage_Controller = Stage_Controller(
+debug=debug,
+verbosity=3)
+stage_row: int = 2
+stage_col: int = 6
 
-### X axis ###
-up_x_button: Button = Button(
+#region: Stage Position
+set_coords_button: Button = Button(
   GUI.root,
-  text = '+x',
-  command = lambda : stage.step('+x')
+  text = 'Set Stage Position',
+  command = lambda : stage.set(x_intput.get(), y_intput.get(), z_intput.get())
   )
-up_x_button.grid(
-  row = 4,
-  column = 6,
+set_coords_button.grid(
+  row = stage_row,
+  column = stage_col,
+  columnspan = 3,
   sticky='nesw')
-GUI.add_widget("up_button", up_x_button)
 
+  
 x_intput = Intput(
   root=GUI.root,
   name="X",
   default=stage.x(),
   debug=debug)
-x_intput.grid(5,6)
+x_intput.grid(stage_row+1,stage_col)
 GUI.add_widget("x_intput", x_intput)
+stage.update_funcs["x"]["x intput"] = lambda: x_intput.set(stage.x())
+
+y_intput = Intput(
+  root=GUI.root,
+  name="Y",
+  default=stage.y(),
+  debug=debug)
+y_intput.grid(stage_row+1,stage_col+1)
+GUI.add_widget("y_intput", y_intput)
+stage.update_funcs["y"]["y intput"] = lambda: y_intput.set(stage.y())
+
+z_intput = Intput(
+  root=GUI.root,
+  name="Z",
+  default=stage.z(),
+  debug=debug)
+z_intput.grid(stage_row+1,stage_col+2)
+GUI.add_widget("z_intput", z_intput)
+stage.update_funcs["z"]["z intput"] = lambda: z_intput.set(stage.z())
+
+  
+#endregion
+
+#region: Stage Step size
+step_size_row: int = 4
+
+step_size_text: Label = Label(
+  GUI.root,
+  text = "Step sizes",
+  justify = 'center',
+  anchor = 'center'
+)
+step_size_text.grid(
+  row = stage_row+step_size_row,
+  column = stage_col,
+  columnspan = 3,
+  sticky='nesw'
+)
+GUI.add_widget("step_size_text", step_size_text)
+
+x_step_intput = Intput(
+  root=GUI.root,
+  name="X",
+  default=1,
+  debug=debug)
+x_step_intput.grid(stage_row+step_size_row+1,stage_col)
+GUI.add_widget("x_step_intput", x_step_intput)
+
+y_step_intput = Intput(
+  root=GUI.root,
+  name="Y",
+  default=1,
+  debug=debug)
+y_step_intput.grid(stage_row+step_size_row+1,stage_col+1)
+GUI.add_widget("y_step_intput", y_step_intput)
+
+z_step_intput = Intput(
+  root=GUI.root,
+  name="Z",
+  default=1,
+  debug=debug)
+z_step_intput.grid(stage_row+step_size_row+1,stage_col+2)
+GUI.add_widget("z_step_intput", z_step_intput)
+
+#endregion
+
+#region: stepping buttons
+step_button_row = 2
+def step_update(axis: Literal['-x','+x','-y','+y','-z','+z']):
+  # first check if the step size has changed
+  if(x_step_intput.changed() or y_step_intput.changed() or z_step_intput.changed()):
+    stage.step_size = (x_step_intput.get(), y_step_intput.get(), z_step_intput.get())
+  stage.step(axis)
+  
+### X axis ###
+up_x_button: Button = Button(
+  GUI.root,
+  text = '+x',
+  command = lambda : step_update('+x')
+  )
+up_x_button.grid(
+  row = stage_row+step_button_row,
+  column = stage_col,
+  sticky='nesw')
+GUI.add_widget("up_button", up_x_button)
 
 down_x_button: Button = Button(
   GUI.root,
   text = '-x',
-  command = lambda : stage.step('-x')
+  command = lambda : step_update('-x')
   )
 down_x_button.grid(
-  row = 6,
-  column = 6,
+  row = stage_row+step_button_row+1,
+  column = stage_col,
   sticky='nesw')
 GUI.add_widget("down_button", down_x_button)
 
@@ -428,30 +524,22 @@ GUI.add_widget("down_button", down_x_button)
 up_y_button: Button = Button(
   GUI.root,
   text = '+y',
-  command = lambda : stage.step('+y')
+  command = lambda : step_update('+y')
   )
 up_y_button.grid(
-  row = 4,
-  column = 7,
+  row = stage_row+step_button_row,
+  column = stage_col+1,
   sticky='nesw')
 GUI.add_widget("up_button", up_y_button)
-
-y_intput = Intput(
-  root=GUI.root,
-  name="Y",
-  default=stage.y(),
-  debug=debug)
-y_intput.grid(5,7)
-GUI.add_widget("y_intput", y_intput)
 
 down_y_button: Button = Button(
   GUI.root,
   text = '-y',
-  command = lambda : stage.step('-y')
+  command = lambda : step_update('-y')
   )
 down_y_button.grid(
-  row = 6,
-  column = 7,
+  row = stage_row+step_button_row+1,
+  column = stage_col+1,
   sticky='nesw')
 GUI.add_widget("down_button", down_y_button)
 
@@ -459,48 +547,30 @@ GUI.add_widget("down_button", down_y_button)
 up_z_button: Button = Button(
   GUI.root,
   text = '+z',
-  command = lambda : stage.step('+z')
+  command = lambda : step_update('+z')
   )
 up_z_button.grid(
-  row = 4,
-  column = 8,
+  row = stage_row+step_button_row,
+  column = stage_col+2,
   sticky='nesw')
 GUI.add_widget("up_button", up_z_button)
-
-z_intput = Intput(
-  root=GUI.root,
-  name="Z",
-  default=stage.z(),
-  debug=debug)
-z_intput.grid(5,8)
-GUI.add_widget("z_intput", z_intput)
 
 down_z_button: Button = Button(
   GUI.root,
   text = '-z',
-  command = lambda : stage.step('-z')
+  command = lambda : step_update('-z')
   )
 down_z_button.grid(
-  row = 6,
-  column = 8,
+  row = stage_row+step_button_row+1,
+  column = stage_col+2,
   sticky='nesw')
 GUI.add_widget("down_button", down_z_button)
 
-set_coords_button: Button = Button(
-  GUI.root,
-  text = 'Set Coords',
-  command = lambda : stage.set(x_intput.get(), y_intput.get(), z_intput.get())
-  )
-set_coords_button.grid(
-  row = 7,
-  column = 6,
-  columnspan = 3,
-  sticky='nesw')
 
 #endregion
 
-#endregion
 
+#endregion
 GUI.debug.info("Debug info will appear here")
 GUI.mainloop()
 

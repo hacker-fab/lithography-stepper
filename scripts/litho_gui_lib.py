@@ -4,7 +4,7 @@ from PIL import ImageTk, Image
 from time import time
 from os.path import basename
 from litho_img_lib import *
-from typing import Callable, Literal, overload
+from typing import Callable, Literal
 
 
 # widget to display info, errors, warning, and text
@@ -178,7 +178,7 @@ class Thumbnail():
     path: str = filedialog.askopenfilename(title ='Open')
     if(self.debug != None):
       if(path == ''):
-        self.debug.warn(self.text+" import cancelled")
+        self.debug.warn(self.text+(" " if self.text!="" else "")+"import cancelled")
         return
       if(path[-4] != "." or not (path[-3:] == "jpg" or path[-3:] == "png")):
         self.debug.error(self.text+" invalid file type: "+path[-3:])
@@ -443,16 +443,19 @@ class TextPopup():
   ### User Fields ###
   button_text: str
   popup_text: str
+  debug: Debug | None
   
   def __init__(self, root: Tk,
                button_text: str = "",
                popup_text: str = "",
-               title: str = "Popup"):
+               title: str = "Popup",
+               debug: Debug | None = None):
     # assign vars
     self.__root__ = root
     self.button_text = button_text
     self.popup_text = popup_text
     self.title = title
+    self.debug = debug
     # build button widget
     button: Button = Button(
       root,
@@ -472,6 +475,8 @@ class TextPopup():
     self.__TL__.grid_rowconfigure(0, weight=1)
     self.__label__ = Label(self.__TL__, text=self.popup_text, justify="left")
     self.__label__.grid(row=0,column=0,sticky="nesw")
+    if(self.debug != None):
+      self.debug.info("Showing "+self.button_text+" popup")
     self.update()
 
   
@@ -578,47 +583,89 @@ class GUI_Controller():
   
 # TODO add theta?
 # TODO make floats?
-# barebones class to manage global stage coordinates
+# TODO add changed() function
+# class to manage global stage coordinates. 
+# can specify list of functions to call when updating coords
+# can add debug widget to print info at various verbosity levels:
+# <=0: no info
+#   1: basic info
+#   2: basic info + function calls
 class Stage_Controller():
-  coords: tuple[int,int,int]
-  step_sizes: tuple[int,int,int]
+  update_funcs: dict[Literal['x','y','z','any'], dict[str, Callable]] = {'x':{}, 'y':{}, 'z':{}, 'any':{}}
+  debug: Debug | None
+  step_size: tuple[int,int,int]
+  __coords__: tuple[int,int,int]
+  __verbosity__: int
+  __locked__: bool = False
   
   def __init__(self,
                starting_coords: tuple[int,int,int] = (0,0,0),
-               step_sizes: tuple[int,int,int] = (1,1,1)):
-    self.coords = starting_coords
-    self.step_sizes = step_sizes
+               step_sizes: tuple[int,int,int] = (1,1,1),
+               debug: Debug | None = None,
+               verbosity: int = 1):
+    self.__coords__ = starting_coords
+    self.step_size = step_sizes
+    self.debug = debug
+    self.__verbosity__ = verbosity
     
+  def __str2key__(self, axis: str) -> Literal['x','y','z','any'] | None:
+    match axis[-1]:
+      case 'x':
+        return 'x'
+      case 'y':
+        if(axis == 'any'):
+          return 'any'
+        else:
+          return 'y'
+      case 'z':
+        return 'z'
   
+  def __call_funcs__(self, axis: str):
+    # convert arbitrary string to literal
+    key: Literal['x','y','z','any']|None = self.__str2key__(axis)
+    if(key == None):
+      return
+    # call all functions
+    for func in self.update_funcs.get(key,{}):
+      self.update_funcs.get(key,{}).get(func, lambda: None)()
+
   #region: Convenience Getters
   def x(self) -> int:
-    return self.coords[0]
+    return self.__coords__[0]
   def y(self) -> int:
-    return self.coords[1]
+    return self.__coords__[1]
   def z(self) -> int:
-    return self.coords[2]
+    return self.__coords__[2]
   def xy(self) -> tuple[int,int]:
-    return (self.coords[0], self.coords[1])
+    return (self.__coords__[0], self.__coords__[1])
   def xz(self) -> tuple[int,int]:
-    return (self.coords[0], self.coords[2])
+    return (self.__coords__[0], self.__coords__[2])
   def yz(self) -> tuple[int,int]:
-    return (self.coords[1], self.coords[2])
+    return (self.__coords__[1], self.__coords__[2])
   def xyz(self) -> tuple[int,int,int]:
-    return self.coords
+    return self.__coords__
   #endregion
   
-  def step(self, axis: Literal['-x','x','+x','-y','y','+y','-z','z','+z'], size: int = 0):
-    # this would be so much simpler and legible with fallthrough
-    # but python is too advanced for basic, fundamental, necessary functionality like fallthrough
+  def lock(self):
+    self.__locked__ = True
+    
+  def unlock(self):
+    self.__locked__ = False
+  
+  def step(self, axis: Literal['-x','x','+x','-y','y','+y','-z','z','+z'], size: int = 0, update: bool = True):
+    if(self.__locked__):
+      if(self.debug != None):
+        self.debug.warn("Tried to move stage while locked")
+      return
     delta: tuple[int,int,int] = (0,0,0)
     if(size == 0):
       match axis[-1]:
         case 'x':
-          delta = (self.step_sizes[0],0,0)
+          delta = (self.step_size[0],0,0)
         case 'y':
-          delta = (0,self.step_sizes[1],0)
+          delta = (0,self.step_size[1],0)
         case 'z':
-          delta = (0,0,self.step_sizes[2])
+          delta = (0,0,self.step_size[2])
     else:
       match axis[-1]:
         case 'x':
@@ -629,9 +676,56 @@ class Stage_Controller():
           delta = (0,0,size)
     if(axis[0] == '-'):
       delta = mult(delta, -1)
-    return add(delta, self.coords)
+    self.__coords__ = add(self.__coords__, delta)
+    if(update):
+      self.__call_funcs__(axis)
+      self.__call_funcs__('any')
+    #region: debug
+    if(self.debug != None and self.__verbosity__ > 0):
+      debug_str: str = ""
+      if(self.__verbosity__ >= 1):
+        debug_str+="stage stepped "+str(delta)+" to "+str(self.__coords__)
+      if(self.__verbosity__ >= 2 and update):
+        debug_str += " and called:"
+        # convert arbitrary string to literal
+        key: Literal['x','y','z','any']|None = self.__str2key__(axis)
+        if(key != None):
+          for func in self.update_funcs.get(key,{}):
+            debug_str += "\n  "+axis[-1]+": "+func
+        for func in self.update_funcs.get('any',{}):
+          debug_str += "\n  any: "+func
+      self.debug.info(debug_str)
+
+  # set coords from a list of set of ints
+  def set(self, x:int, y:int, z:int, update: bool = True):
+    if(self.__locked__):
+      if(self.debug != None):
+        self.debug.warn("Tried to move stage while locked")
+      return
+    self.__coords__ = (x,y,z)
+    if(update):
+      self.__call_funcs__('x')
+      self.__call_funcs__('y')
+      self.__call_funcs__('z')
+      self.__call_funcs__('any')
+    #region: debug
+    if(self.debug != None and self.__verbosity__ > 0):
+      debug_str: str = ""
+      if(self.__verbosity__ >= 1):
+        debug_str+="stage set to "+str((x,y,z))
+      if(self.__verbosity__ >= 2 and update):
+        debug_str += " and called:"
+        for func in self.update_funcs.get('x',{}):
+          debug_str += "\n  x: "+func
+        for func in self.update_funcs.get('y',{}):
+          debug_str += "\n  y: "+func
+        for func in self.update_funcs.get('z',{}):
+          debug_str += "\n  z: "+func
+        for func in self.update_funcs.get('any',{}):
+          debug_str += "\n  any: "+func
+      self.debug.info(debug_str)
+    #endregion
+  #endregion
   
-  def set(self, x:int, y:int, z:int):
-    self.coords = (x,y,z)
-    
+  
   
