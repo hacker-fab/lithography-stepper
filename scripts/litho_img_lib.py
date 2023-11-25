@@ -288,11 +288,28 @@ def better_transform(image: Image.Image,
   return img_cpy
   
 
-#TODO write a function that will tell you if the vector is too large and will exit given borders, efficiently
+# add tuples, return new tuple
+def add(a:tuple[int,...]|int, b:tuple[int,...]|int) -> tuple[int,...]|int:
+  if(type(a) == int and type(b) == int):
+    return a+b
+  elif(type(a) == int):
+    return tuple([x+a for x in b])
+  elif(type(b) == int):
+    return tuple([x+b for x in a])
+  else:
+    return tuple([x+y for x,y in zip(a,b)])
 
+def mult(a:tuple[int,...], b:tuple[int,...]) -> tuple[int,...]:
+  if(type(a) == int and type(b) == int):
+    return a*b
+  elif(type(a) == int):
+    return tuple([x*a for x in b])
+  elif(type(b) == int):
+    return tuple([x*b for x in a])
+  else:
+    return tuple([x*y for x,y in zip(a,b)])
 
 # automated test suite
-
 def __run_tests():
   # will print a and b on fail
   def print_assert(a, b, name: str = ""):
@@ -365,6 +382,17 @@ def __run_tests():
   for i in range(100):
     print_assert(alpha_to_dec(dec_to_alpha(i)), i, str(i)+":4")
     
+    
+  print_assert(add((1,2,3),(3,2,1)), (4,4,4))
+  print_assert(add((1,2,3),1), (2,3,4))
+  print_assert(add(1,(3,2,1)), (4,3,2))
+  print_assert(add(1,1), 2)
+  
+  print_assert(mult((1,2,3),(3,2,1)), (3,4,3))
+  print_assert(mult((1,2,3),2), (2,4,6))
+  print_assert(mult(2,(3,2,1)), (6,4,2))
+  print_assert(mult(2,2), 4)
+  
   print("All tests passed")
 __run_tests()
 

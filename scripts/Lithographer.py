@@ -1,4 +1,4 @@
-from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label, ttk
+from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label, Text
 from tkinter.ttk import Progressbar
 from PIL import ImageTk, Image
 from litho_img_lib import *
@@ -8,7 +8,7 @@ from litho_gui_lib import *
 # text display (for current motor coordinates)
 # Dpad Buttons (moving the motors)
 # spot for "entire layer" image
-# spot for "c qurrent tile" image
+# spot for "current tile" image
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -16,20 +16,18 @@ from litho_gui_lib import *
 # - add a button to show pure white image for flatfield correction
 # - fix bug where flatfield pattern is reapplied on second pattern show
 #     to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
-# - Nonblocking patterning
 # 
 
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 
-#region: widgets
-
 # GUI Controller
-GUI: GUI_Controller = GUI_Controller(grid_size = (5,6),
-                                     title = "Lithographer V1.2.3")
+GUI: GUI_Controller = GUI_Controller(grid_size = (9,9),
+                                     title = "Lithographer V1.2.4",
+                                     add_window_size=(0,300))
 # Debugger
 debug: Debug = Debug(root=GUI.root)
-debug.grid(4,0,colspan=5)
+debug.grid(8,0,colspan=5)
 GUI.add_widget("debug", debug)
 
 #region: Import thumbnails
@@ -37,7 +35,7 @@ pattern_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                      thumb_size=THUMBNAIL_SIZE,
                                      text="Pattern",
                                      debug=debug)
-pattern_thumb.grid(2,0)
+pattern_thumb.grid(4,0, rowspan=4)
 GUI.add_widget("pattern_thumb", pattern_thumb)
 
 # return a guess for correction intensity, 0 to 50 %
@@ -50,21 +48,21 @@ flatfield_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                         debug=debug,
                                         accept_alpha=True,
                                         func_on_success=guess_alpha)
-flatfield_thumb.grid(2,1, colspan=2)
+flatfield_thumb.grid(4,1, colspan=2, rowspan=4)
 GUI.add_widget("flatfield_thumb", flatfield_thumb)
 
 red_focus_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                         thumb_size=THUMBNAIL_SIZE,
                                         text="Red Focus",
                                         debug=debug)
-red_focus_thumb.grid(2,3)
+red_focus_thumb.grid(4,3, rowspan=4)
 GUI.add_widget("red_focus_thumb", red_focus_thumb)
 
 uv_focus_thumb: Thumbnail = Thumbnail(root=GUI.root,
                                       thumb_size=THUMBNAIL_SIZE,
                                       text="UV Focus",
                                       debug=debug)
-uv_focus_thumb.grid(2,4)
+uv_focus_thumb.grid(4,4, rowspan=4)
 GUI.add_widget("uv_focus_thumb", uv_focus_thumb)
 #endregion
 
@@ -72,11 +70,11 @@ GUI.add_widget("uv_focus_thumb", uv_focus_thumb)
 posterize_toggle: Toggle = Toggle(root=GUI.root,
                                   text=("Now Posterizing","NOT Posterizing"),
                                   debug=debug)
-posterize_toggle.grid(0,1)
+posterize_toggle.grid(2,1)
 flatfield_toggle: Toggle = Toggle(root=GUI.root,
                                   text=("Using Flatfield","NOT Using Flatfield"),
                                   debug=debug)
-flatfield_toggle.grid(1,1)
+flatfield_toggle.grid(3,1)
 #endregion
 
 #region: intput fields
@@ -88,7 +86,7 @@ FF_strength_intput: Intput = Intput(
   min = 0,
   max = 100,
   debug=debug)
-FF_strength_intput.grid(1,2)
+FF_strength_intput.grid(3,2)
 GUI.add_widget("FF_strength_intput", FF_strength_intput)
 
 duration_intput: Intput = Intput(
@@ -97,7 +95,7 @@ duration_intput: Intput = Intput(
   default=1000,
   min = 0,
   debug=debug)
-duration_intput.grid(1,5)
+duration_intput.grid(3,5)
 GUI.add_widget("duration_intput", duration_intput)
 
 post_strength_intput: Intput = Intput(
@@ -108,7 +106,7 @@ post_strength_intput: Intput = Intput(
   max=100,
   debug=debug
 )
-post_strength_intput.grid(0,2)
+post_strength_intput.grid(2,2)
 GUI.add_widget("post_strength_intput", post_strength_intput)
 
 #endregion
@@ -122,7 +120,7 @@ clear_button: Button = Button(
   bg = 'black',
   fg = 'white')
 clear_button.grid(
-  row = 0,
+  row = 2,
   column = 0,
   sticky='nesw')
 GUI.add_widget("clear_button", clear_button)
@@ -156,7 +154,7 @@ red_focus_button: Button = Button(
   text = 'Show Red Focus',
   command = show_red_focus)
 red_focus_button.grid(
-  row = 0,
+  row = 2,
   rowspan = 2,
   column = 3,
   sticky='nesw')
@@ -180,7 +178,7 @@ uv_focus_button: Button = Button(
   text = 'Show UV Focus',
   command = show_uv_focus)
 uv_focus_button.grid(
-  row = 0,
+  row = 2,
   rowspan = 2,
   column = 4,
   sticky='nesw')
@@ -236,8 +234,8 @@ def prep_pattern() -> None:
 def show_pattern_timed() -> None:
   prep_pattern()
   debug.info("Patterning for " + str(duration_intput.get()) + "ms")
-  GUI.proj.show(pattern_thumb.temp_image, duration=duration_intput.get())
-  debug.info("Done")
+  result = GUI.proj.show(pattern_thumb.temp_image, duration=duration_intput.get())
+  if(result): debug.info("Done")
 pattern_button_timed: Button = Button(
   GUI.root,
   text = 'Begin\nPatterning',
@@ -245,8 +243,9 @@ pattern_button_timed: Button = Button(
   bg = 'red',
   fg = 'white')
 pattern_button_timed.grid(
-  row = 2,
+  row = 4,
   column = 5,
+  rowspan=4,
   sticky='nesw')
 GUI.add_widget("pattern_button_timed", pattern_button_timed)
 
@@ -260,7 +259,7 @@ pattern_button_fixed: Button = Button(
   text = 'Show Pattern',
   command = show_pattern_fixed)
 pattern_button_fixed.grid(
-  row = 1,
+  row = 3,
   column = 0,
   sticky='nesw')
 GUI.add_widget("pattern_button_fixed", pattern_button_fixed)
@@ -279,7 +278,7 @@ duration_text: Label = Label(
   anchor = 'center'
 )
 duration_text.grid(
-  row = 0,
+  row = 2,
   column = 5,
   sticky='nesw'
 )
@@ -360,7 +359,7 @@ help_popup: TextPopup = TextPopup(
   title="Help Popup",
   button_text="Help",
   popup_text=help_text)
-help_popup.grid(4,5)
+help_popup.grid(8,5)
 #endregion
 
 #region: progress bars
@@ -370,21 +369,141 @@ pattern_progress: Progressbar = Progressbar(
   mode='determinate',
   )
 pattern_progress.grid(
-  row = 3,
+  row = 1,
   column = 0,
-  columnspan = 6,
+  columnspan = GUI.grid_size[1],
   sticky='nesw')
 GUI.proj.progressbar = pattern_progress
+GUI.add_widget("pattern_progress", pattern_progress)
+#endregion
+
+#region: Camera
+camera: Thumbnail = Thumbnail(root=GUI.root,
+                              thumb_size=(GUI.window_size[0],(GUI.window_size[0]*9)//16),
+                              debug=debug)
+camera.grid(
+  row=0,
+  col=0,
+  colspan=GUI.grid_size[1],
+)
+#endregion
+
+#region: Stage Control
+
+stage: Stage_Controller = Stage_Controller()
+#region: Buttons
+
+### X axis ###
+up_x_button: Button = Button(
+  GUI.root,
+  text = '+x',
+  command = lambda : stage.step('+x')
+  )
+up_x_button.grid(
+  row = 4,
+  column = 6,
+  sticky='nesw')
+GUI.add_widget("up_button", up_x_button)
+
+x_intput = Intput(
+  root=GUI.root,
+  name="X",
+  default=stage.x(),
+  debug=debug)
+x_intput.grid(5,6)
+GUI.add_widget("x_intput", x_intput)
+
+down_x_button: Button = Button(
+  GUI.root,
+  text = '-x',
+  command = lambda : stage.step('-x')
+  )
+down_x_button.grid(
+  row = 6,
+  column = 6,
+  sticky='nesw')
+GUI.add_widget("down_button", down_x_button)
+
+### Y axis ###
+up_y_button: Button = Button(
+  GUI.root,
+  text = '+y',
+  command = lambda : stage.step('+y')
+  )
+up_y_button.grid(
+  row = 4,
+  column = 7,
+  sticky='nesw')
+GUI.add_widget("up_button", up_y_button)
+
+y_intput = Intput(
+  root=GUI.root,
+  name="Y",
+  default=stage.y(),
+  debug=debug)
+y_intput.grid(5,7)
+GUI.add_widget("y_intput", y_intput)
+
+down_y_button: Button = Button(
+  GUI.root,
+  text = '-y',
+  command = lambda : stage.step('-y')
+  )
+down_y_button.grid(
+  row = 6,
+  column = 7,
+  sticky='nesw')
+GUI.add_widget("down_button", down_y_button)
+
+### Z axis ###
+up_z_button: Button = Button(
+  GUI.root,
+  text = '+z',
+  command = lambda : stage.step('+z')
+  )
+up_z_button.grid(
+  row = 4,
+  column = 8,
+  sticky='nesw')
+GUI.add_widget("up_button", up_z_button)
+
+z_intput = Intput(
+  root=GUI.root,
+  name="Z",
+  default=stage.z(),
+  debug=debug)
+z_intput.grid(5,8)
+GUI.add_widget("z_intput", z_intput)
+
+down_z_button: Button = Button(
+  GUI.root,
+  text = '-z',
+  command = lambda : stage.step('-z')
+  )
+down_z_button.grid(
+  row = 6,
+  column = 8,
+  sticky='nesw')
+GUI.add_widget("down_button", down_z_button)
+
+set_coords_button: Button = Button(
+  GUI.root,
+  text = 'Set Coords',
+  command = lambda : stage.set(x_intput.get(), y_intput.get(), z_intput.get())
+  )
+set_coords_button.grid(
+  row = 7,
+  column = 6,
+  columnspan = 3,
+  sticky='nesw')
+
+#endregion
+
 #endregion
 
 GUI.debug.info("Debug info will appear here")
 GUI.mainloop()
 
 
-#endregion
-
-# pattern responds to both, obviously
-# show red posterizes if enabled, but not flatfield
-# UV doesn't respond to either
 
 

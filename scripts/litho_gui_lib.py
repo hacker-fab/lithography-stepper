@@ -4,7 +4,7 @@ from PIL import ImageTk, Image
 from time import time
 from os.path import basename
 from litho_img_lib import *
-from typing import Callable, Literal
+from typing import Callable, Literal, overload
 
 
 # widget to display info, errors, warning, and text
@@ -354,6 +354,7 @@ class Projector_Controller():
   __TL__: Toplevel
   __label__: Label
   __root__: Tk
+  __is_patterning__: bool = False
   # just a black image to clear with
   __clearImage__: ImageTk.PhotoImage
   ### optional user args ###
@@ -386,7 +387,11 @@ class Projector_Controller():
     
   # show an image
   # if a duration is specified, show the image for that many milliseconds
-  def show(self, image: Image.Image, duration: int = 0):
+  def show(self, image: Image.Image, duration: int = 0) -> bool:
+    if(self.__is_patterning__):
+      if(self.debug != None):
+        self.debug.warn("Tried to show image while another is still showing")
+      return False
     img_copy: Image.Image = image.copy()
     # warn if image isn't correct size
     if(img_copy.size != fit_image(img_copy, self.size())):
@@ -396,22 +401,25 @@ class Projector_Controller():
     self.__label__.config(image = photo)
     self.__label__.image = photo
     if(duration > 0):
+      self.__is_patterning__ = True
       end = time() + duration / 1000
       # update and begin
       self.update()
-      while(time() < end):
+      while(time() < end and self.__is_patterning__):
         if(self.progressbar != None):
           self.progressbar['value'] = 100 - ((end - time()) / duration * 100000)
-          self.__root__.update_idletasks()
+          self.__root__.update()
         pass
       self.clear()
     else:
       self.update()
+    return True
   
   # clear the projector window
   def clear(self):
     self.__label__.config(image = self.__clearImage__)
     self.__label__.image = self.__clearImage__
+    self.__is_patterning__ = False
     if(self.progressbar != None):
       self.progressbar['value'] = 0
     self.update()
@@ -504,17 +512,22 @@ class GUI_Controller():
   
   def __init__( self,
                 grid_size: tuple[int,int],
-                window_size: tuple[int,int] = (900, 220),
+                set_window_size: tuple[int,int] = (0, 0),
+                add_window_size: tuple[int,int] = (0, 0),
                 title: str = "GUI Controller",
                 resizeable: bool = True
                 ):
     # store user input variables
     self.grid_size = grid_size
-    self.window_size = window_size
     self.title = title
     self.resizeable = resizeable
     # setup root / gui window
     self.root = Tk()
+    self.window_size = set_window_size
+    if(set_window_size == (0,0)):
+      self.window_size = (self.root.winfo_screenwidth()//2, self.root.winfo_screenheight()//2)
+    if(add_window_size != (0,0)):
+      self.window_size = (self.window_size[0]+add_window_size[0], self.window_size[1]+add_window_size[1])
     self.root.title(self.title)
     self.root.geometry(str(self.window_size[0])+"x"+str(self.window_size[1]))
     self.root.resizable(width = self.resizeable, height = self.resizeable)
@@ -563,7 +576,62 @@ class GUI_Controller():
   def mainloop(self):
     self.root.mainloop()
   
-
+# TODO add theta?
+# TODO make floats?
+# barebones class to manage global stage coordinates
+class Stage_Controller():
+  coords: tuple[int,int,int]
+  step_sizes: tuple[int,int,int]
   
+  def __init__(self,
+               starting_coords: tuple[int,int,int] = (0,0,0),
+               step_sizes: tuple[int,int,int] = (1,1,1)):
+    self.coords = starting_coords
+    self.step_sizes = step_sizes
+    
   
+  #region: Convenience Getters
+  def x(self) -> int:
+    return self.coords[0]
+  def y(self) -> int:
+    return self.coords[1]
+  def z(self) -> int:
+    return self.coords[2]
+  def xy(self) -> tuple[int,int]:
+    return (self.coords[0], self.coords[1])
+  def xz(self) -> tuple[int,int]:
+    return (self.coords[0], self.coords[2])
+  def yz(self) -> tuple[int,int]:
+    return (self.coords[1], self.coords[2])
+  def xyz(self) -> tuple[int,int,int]:
+    return self.coords
+  #endregion
+  
+  def step(self, axis: Literal['-x','x','+x','-y','y','+y','-z','z','+z'], size: int = 0):
+    # this would be so much simpler and legible with fallthrough
+    # but python is too advanced for basic, fundamental, necessary functionality like fallthrough
+    delta: tuple[int,int,int] = (0,0,0)
+    if(size == 0):
+      match axis[-1]:
+        case 'x':
+          delta = (self.step_sizes[0],0,0)
+        case 'y':
+          delta = (0,self.step_sizes[1],0)
+        case 'z':
+          delta = (0,0,self.step_sizes[2])
+    else:
+      match axis[-1]:
+        case 'x':
+          delta = (size,0,0)
+        case 'y':
+          delta = (0,size,0)
+        case 'z':
+          delta = (0,0,size)
+    if(axis[0] == '-'):
+      delta = mult(delta, -1)
+    return add(delta, self.coords)
+  
+  def set(self, x:int, y:int, z:int):
+    self.coords = (x,y,z)
+    
   
