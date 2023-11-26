@@ -287,6 +287,55 @@ def better_transform(image: Image.Image,
   img_cpy = Image.Image.transform(img_cpy, output_size, Image.Transform.AFFINE, affine_matrix, resample=Image.Resampling.BICUBIC, fillcolor="black")
   return img_cpy
   
+# slices image into parts
+def slice(image: Image.Image,
+          horizontal_tiles: int = 1,
+          vertical_tiles: int = 1,
+          output_resolution: tuple[int,int] = (0,0)
+          ) -> tuple[tuple[int,int],tuple[Image.Image,...]]:
+  
+  # if no parameters specified, return original image
+  if(horizontal_tiles <= 1 and vertical_tiles <= 1 and output_resolution == (0,0)):
+    return ((1,1),(image.copy(),))
+
+  input_ratio: float = image.size[0] / image.size[1]
+  output_ratio: float
+  if(output_resolution == (0,0)):
+    output_ratio = horizontal_tiles / vertical_tiles
+  else:
+    output_ratio = output_resolution[0] / output_resolution[1]
+    
+  grid: tuple[int,int]
+  slice_size: tuple[int,int]
+  if(horizontal_tiles > 1 and vertical_tiles > 1):
+    # both specified, make this the new ratio
+    output_ratio = horizontal_tiles / vertical_tiles
+    grid = (horizontal_tiles, vertical_tiles)
+    slice_size = (ceil(image.size[0]/horizontal_tiles), ceil(image.size[1]/vertical_tiles))
+  elif(horizontal_tiles <= 1 and vertical_tiles <= 1):
+    grid = (ceil(image.size[0]/output_resolution[0]), ceil(image.size[1]/output_resolution[1]))
+    slice_size = output_resolution
+  elif(horizontal_tiles > 1):
+    temp: float = input_ratio * 1/output_ratio * horizontal_tiles
+    grid = (ceil(temp), horizontal_tiles)
+    slice_size = (ceil(image.size[0]/temp), ceil(image.size[1]/horizontal_tiles))
+  elif(vertical_tiles > 1):
+    temp: float = output_ratio * 1/input_ratio * vertical_tiles
+    grid = (vertical_tiles, ceil(temp))
+    slice_size = (ceil(image.size[0]/vertical_tiles), ceil(image.size[1]/temp))
+  else:
+    # this is unreachable, but it makes the linter happy
+    grid = (1,1)
+    slice_size = image.size
+
+  output: list[Image.Image] = []
+  for row in range(grid[1]):
+    for col in range(grid[0]):
+      cropped: Image.Image = image.crop((col*slice_size[0], row*slice_size[1], (col+1)*slice_size[0], (row+1)*slice_size[1]))
+      if(output_resolution != (0,0)):
+        cropped = cropped.resize(output_resolution, resample=Image.Resampling.LANCZOS)
+      output.append(cropped)
+  return (grid, tuple(output))
 
 # add tuples, return new tuple
 def add(a:tuple[int,...]|int, b:tuple[int,...]|int) -> tuple[int,...]|int:
@@ -418,4 +467,7 @@ if(False):
   __timing_tests((2560,1440),50)
   __timing_tests((3840,2160),50)
 
+# propt user for image
+# image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
+# for i in slice(image, vertical_tiles=2)[1]: i.show()
 
