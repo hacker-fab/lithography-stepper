@@ -12,6 +12,7 @@ from litho_gui_lib import *
 # - make camera (and thumbnails ideally) auto resize images / have images fill the widget
 # - make the big red "begin patterning" button change color while patterning
 # - when a tile of the pattern is finished, change it back to red and say "override"
+# - add pause when tiling to allow cv to move around
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -25,23 +26,24 @@ from litho_gui_lib import *
 # - Make an interactive version of the help message popup, it's getting long
 # - make the "show" buttons change color while that pattern is being showed
 
-''' V1.2.6 Patch Notes
+''' V1.3.0 Patch Notes
 
 **Major**
-- Implemented slicer
+- Implemented slicer and stepping
  - The main slicing code is a standalone function in litho_img_lib, it's **very** feature rich and robust
  - implemented a class to allow for easier stepping through the slices
- - integrated this with the rest of the GUI 
+ - integrated this with the rest of the GUI, this was _very_ hard
 **Minor**
 - Keyboard Input for moving stage
  - Can now move stage with the arrow keys: up/down/left/right for xy and ctrl or shift + up/down for z axis
 - Yet another large layout redesign
+- backend refactoring
+- abort button is dynamic now
+- added a progress bar for the total progress of the pattern
 
-**For V1.3.0**
-- Add a pattern slicer
-- Add automated exposure and stepping
+**For V2.0.0**
 - Add live camera feed
-- More code refactoring, especially the main file. It's getting longgggg
+- Integrate with CV
 
 **Nerd Stuff**
 - Refactored the widgets to be organized by category.
@@ -51,8 +53,8 @@ from litho_gui_lib import *
 
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
-CHIN_SIZE: int = 350
-GUI: GUI_Controller = GUI_Controller(grid_size = (13,11),
+CHIN_SIZE: int = 400
+GUI: GUI_Controller = GUI_Controller(grid_size = (14,10),
                                      title = "Lithographer V1.2.5",
                                      add_window_size=(0,CHIN_SIZE))
 SPACER_SIZE: int = GUI.window_size[0]//(GUI.grid_size[1]*5)
@@ -62,24 +64,33 @@ SPACER_SIZE: int = GUI.window_size[0]//(GUI.grid_size[1]*5)
 debug: Debug = Debug(root=GUI.root)
 GUI.add_widget("debug", debug)
 
-#region: large functions
+#region: functions
 
-def prep_pattern() -> None:
+slicer: Slicer = Slicer(output_resolution=GUI.proj.size(),
+                        tiling_pattern='snake',
+                        debug=debug)
+
+#returns modified version of input image, optionally updates thumbnail with image
+def prep_pattern(input_image: Image.Image, thumb: Thumbnail | None = None) -> Image.Image:
+  image = input_image.copy()
+  def update_thumb() -> None:
+    if(thumb != None):
+      thumb.temp_image = image
+      thumb.update_thumbnail(image)
+      
   # posterizeing
-  image: Image.Image = pattern_thumb.temp_image
   if(posterize_toggle.state and ((not (image.mode == 'L' or image.mode == 'LA')) or post_strength_intput.changed())):
     # posterizing enabled, and image isn't poterized
     debug.info("Posterizing...")
-    pattern_thumb.temp_image = posterize(pattern_thumb.image, round((post_strength_intput.get()*255)/100))
-    pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
-  elif(not posterize_toggle.state and (image.mode == 'L' or image.mode == 'LA')):
+    image = posterize(image, round((post_strength_intput.get()*255)/100))
+  elif(not posterize_toggle.state and (image.mode == 'L' or image.mode == 'LA') and thumb != None):
     # posterizing disabled, but image is posterized
-    debug.info("Resetting Posterizing...")
-    pattern_thumb.temp_image = pattern_thumb.image
-    pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
+      debug.info("Resetting Posterizing...")
+      thumb.temp_image = thumb.image
+      thumb.update_thumbnail(thumb.image)
+      image = thumb.image
   
   # flatfield correction
-  image = pattern_thumb.temp_image
   if(flatfield_toggle.state and (image.mode == 'L' or image.mode == 'RGB' or 
      FF_strength_intput.changed())):
     debug.info("Applying flatfield corretion...")
@@ -87,23 +98,26 @@ def prep_pattern() -> None:
                                              new_scale=dec_to_alpha(FF_strength_intput.get()),
                                              target_size=image.size,
                                              downsample_target=540)
-    pattern_thumb.temp_image.putalpha(alpha_channel)
-    pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
+    image.putalpha(alpha_channel)
   elif(not flatfield_toggle.state):
-    if(image.mode == 'RGBA'):
+    if(image.mode == 'RGBA' and thumb != None):
       debug.info("Removing flatfield corretion...")
-      pattern_thumb.temp_image = RGBA_to_RGB(pattern_thumb.temp_image)
-      pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
-    if(image.mode == 'LA'):
+      thumb.temp_image = RGBA_to_RGB(thumb.temp_image)
+      thumb.update_thumbnail(thumb.temp_image)
+      image = thumb.image
+    if(image.mode == 'LA' and thumb != None):
       debug.info("Removing flatfield corretion...")
-      pattern_thumb.temp_image = LA_to_L(pattern_thumb.temp_image)
-      pattern_thumb.update_thumbnail(pattern_thumb.temp_image)
+      thumb.temp_image = LA_to_L(thumb.temp_image)
+      thumb.update_thumbnail(thumb.temp_image)
+      image = thumb.image
+      
   # resizeing
-  image = pattern_thumb.temp_image
   if(image.size != fit_image(image, GUI.proj.size())):
     debug.info("Resizing...")
-    pattern_thumb.temp_image = image.resize(fit_image(image, GUI.proj.size()), Image.Resampling.LANCZOS)
+    image = image.resize(fit_image(image, GUI.proj.size()), Image.Resampling.LANCZOS)
   
+  update_thumb()
+  return image
 
 #endregion
 
@@ -120,6 +134,7 @@ camera.grid(
   sticky='nesw')
 GUI.add_widget("camera", camera)
 
+# overall pattern progress bar
 pattern_progress: Progressbar = Progressbar(
   GUI.root,
   orient='horizontal',
@@ -130,10 +145,21 @@ pattern_progress.grid(
   column = 0,
   columnspan = GUI.grid_size[1],
   sticky='nesw')
-GUI.proj.progressbar = pattern_progress
 GUI.add_widget("pattern_progress", pattern_progress)
 
-#TODO add overall progress bar here
+# Current exposure Progress
+exposure_progress: Progressbar = Progressbar(
+  GUI.root,
+  orient='horizontal',
+  mode='determinate',
+  )
+exposure_progress.grid(
+  row = 2,
+  column = 0,
+  columnspan = GUI.grid_size[1],
+  sticky='nesw')
+GUI.proj.progressbar = exposure_progress
+GUI.add_widget("exposure_progress", exposure_progress)
 
 #endregion
 
@@ -218,7 +244,7 @@ help_popup.grid(GUI.grid_size[0]-1,GUI.grid_size[1]-1)
 #endregion
 
 #region: imports / thumbnails
-import_row: int = 2
+import_row: int = 3
 import_col: int = 0
 
 #region: Pattern
@@ -230,7 +256,7 @@ GUI.add_widget("pattern_thumb", pattern_thumb)
 
 
 def show_pattern_fixed() -> None:
-  prep_pattern()
+  pattern_thumb.temp_image = prep_pattern(pattern_thumb.temp_image)
   debug.info("Showing Pattern")
   GUI.proj.show(pattern_thumb.temp_image)
 pattern_button_fixed: Button = Button(
@@ -348,7 +374,7 @@ GUI.add_widget("uv_focus_button", uv_focus_button)
 GUI.root.grid_columnconfigure(2, minsize=SPACER_SIZE)
 
 #region: Stage Control Area
-stage_row: int = 2
+stage_row: int = 3
 stage_col: int = 3
 
 stage: Stage_Controller = Stage_Controller(
@@ -550,60 +576,37 @@ GUI.root.bind('<Shift-Down>', lambda event: step_update('-z'))
 GUI.root.grid_columnconfigure(6, minsize=SPACER_SIZE)
 
 #region: Patterning Area
-pattern_row: int = 2
+pattern_row: int = 3
 pattern_col: int = 7
 
-#region: buttons
+#region: Options
+options_row: int = 0
+options_col: int = 0
 
-# big red danger button
-def show_pattern_timed() -> None:
-  prep_pattern()
-  debug.info("Patterning for " + str(duration_intput.get()) + "ms")
-  stage.lock()
-  result = GUI.proj.show(pattern_thumb.temp_image, duration=duration_intput.get())
-  if(result):
-    stage.unlock()
-    debug.info("Done")
-pattern_button_timed: Button = Button(
+options_text: Label = Label(
   GUI.root,
-  text = 'Begin\nPatterning',
-  command = show_pattern_timed,
-  bg = 'red',
-  fg = 'white')
-pattern_button_timed.grid(
-  row = pattern_row+2,
-  column = pattern_col+2,
-  rowspan=4,
-  sticky='nesw')
-GUI.add_widget("pattern_button_timed", pattern_button_timed)
+  text = "Options",
+  justify = 'center',
+  anchor = 'center'
+)
+options_text.grid(
+  row = pattern_row+options_row,
+  column = pattern_col+options_col,
+  columnspan = 3,
+  sticky='nesw'
+)
+GUI.add_widget("options_text", options_text)
 
-
-clear_button: Button = Button(
-  GUI.root,
-  text = 'Clear',
-  command = GUI.proj.clear,
-  bg = 'black',
-  fg = 'white')
-clear_button.grid(
-  row = pattern_row,
-  column = pattern_col+2,
-  sticky='nesw')
-GUI.add_widget("clear_button", clear_button)
-
-#endregion
-
-#region: intput options
-
-# pattern duration
+#region: duration
 duration_text: Label = Label(
   GUI.root,
-  text = "Duration (ms)",
+  text = "Exposure Time (ms)",
   justify = 'center',
   anchor = 'center'
 )
 duration_text.grid(
-  row = pattern_row,
-  column = pattern_col,
+  row = pattern_row+options_row+1,
+  column = pattern_col+options_col,
   sticky='nesw'
 )
 GUI.add_widget("duration_text", duration_text)
@@ -614,19 +617,55 @@ duration_intput: Intput = Intput(
   default=1000,
   min = 0,
   debug=debug)
-duration_intput.grid(pattern_row,pattern_col+1)
+duration_intput.grid(pattern_row+options_row+1,pattern_col+options_col+1, colspan=2)
 GUI.add_widget("duration_intput", duration_intput)
 
-# flatfield Strength
+#endregion
+
+#region: slicer settings
+
+slicer_horiz_text: Label = Label(
+  GUI.root,
+  text = "Tiles (horiz, vert)"
+)
+slicer_horiz_text.grid(
+  row = pattern_row+options_row+2,
+  column = pattern_col+options_col,
+  sticky='nesw'
+)
+GUI.add_widget("slicer_horiz_text", slicer_horiz_text)
+
+slicer_horiz_intput: Intput = Intput(
+  root=GUI.root,
+  name="Slicer Horiz",
+  default=1,
+  min=1,
+  debug=debug
+)
+slicer_horiz_intput.grid(pattern_row+options_row+2,pattern_col+options_col+1)
+GUI.add_widget("slicer_horiz_intput", slicer_horiz_intput)
+
+slicer_vert_intput: Intput = Intput(
+  root=GUI.root,
+  name="Slicer Vert",
+  default=1,
+  min=1,
+  debug=debug
+)
+slicer_vert_intput.grid(pattern_row+options_row+2,pattern_col+options_col+2)
+GUI.add_widget("slicer_vert_intput", slicer_vert_intput)
+#endregion
+
+#region: flatfield
 FF_strength_text: Label = Label(
   GUI.root,
-  text = "Flatfield Strength",
+  text = "Flatfield Strength (%)",
   justify = 'center',
   anchor = 'center'
 )
 FF_strength_text.grid(
-  row = pattern_row+1,
-  column = pattern_col,
+  row = pattern_row+options_row+3,
+  column = pattern_col+options_col,
   sticky='nesw'
 )
 GUI.add_widget("FF_strength_text", FF_strength_text)
@@ -638,19 +677,25 @@ FF_strength_intput: Intput = Intput(
   min = 0,
   max = 100,
   debug=debug)
-FF_strength_intput.grid(pattern_row+1,pattern_col+1)
+FF_strength_intput.grid(pattern_row+options_row+3,pattern_col+options_col+1)
 GUI.add_widget("FF_strength_intput", FF_strength_intput)
 
-# posterize Cutoff
+flatfield_toggle: Toggle = Toggle(root=GUI.root,
+                                  text=("Using Flatfield","NOT Using Flatfield"),
+                                  debug=debug)
+flatfield_toggle.grid(pattern_row+options_row+3,pattern_col+options_col+2)
+#endregion
+
+#region: posterize
 post_strength_text: Label = Label(
   GUI.root,
-  text = "Posterize Cutoff",
+  text = "Posterize Cutoff (%)",
   justify = 'center',
   anchor = 'center'
 )
 post_strength_text.grid(
-  row = pattern_row+2,
-  column = pattern_col,
+  row = pattern_row+options_row+4,
+  column = pattern_col+options_col,
   sticky='nesw'
 )
 GUI.add_widget("post_strength_text", post_strength_text)
@@ -663,42 +708,183 @@ post_strength_intput: Intput = Intput(
   max=100,
   debug=debug
 )
-post_strength_intput.grid(pattern_row+2,pattern_col+1)
+post_strength_intput.grid(pattern_row+options_row+4,pattern_col+options_col+1)
 GUI.add_widget("post_strength_intput", post_strength_intput)
-#endregion
 
-#region: Toggles
-flatfield_toggle: Toggle = Toggle(root=GUI.root,
-                                  text=("Using Flatfield","NOT Using Flatfield"),
-                                  debug=debug)
-flatfield_toggle.grid(pattern_row+3,pattern_col)
 posterize_toggle: Toggle = Toggle(root=GUI.root,
                                   text=("Now Posterizing","NOT Posterizing"),
                                   debug=debug)
-posterize_toggle.grid(pattern_row+3,pattern_col+1)
+posterize_toggle.grid(pattern_row+options_row+4,pattern_col+options_col+2)
+#endregion
 
 #endregion
 
 #region: Current Tile
-
+current_tile_row = 5
+current_tile_col = 0
 
 Current_tile_text: Label = Label(
   GUI.root,
+  text = "Current Tile",
+  
 )
 Current_tile_text.grid(
-  row = pattern_row+4,
-  column = pattern_col,
+  row = pattern_row+current_tile_row,
+  column = pattern_col+current_tile_col,
   columnspan = 2,
   sticky='nesw'
 )
 GUI.add_widget("Current_tile_text", Current_tile_text)
 
+tile_placeholder = rasterize(Image.new('RGB', THUMBNAIL_SIZE, (0,0,0)))
 current_tile_image: Label = Label(
   GUI.root,
-  text = "No Image",
+  image = tile_placeholder,
   justify = 'center',
   anchor = 'center'
 )
+current_tile_image.grid(
+  row = pattern_row+current_tile_row+1,
+  column = pattern_col+current_tile_col,
+  rowspan=4,
+  columnspan=2,
+  sticky='nesw'
+)
+
+#endregion
+
+# region: Danger Buttons
+buttons_row = 5
+buttons_col = 2
+
+pattern_status: Literal['idle','patterning', 'aborting'] = 'idle'
+def change_patterning_status(new_status: Literal['idle','patterning', 'aborting']) -> None:
+  global pattern_status
+  match pattern_status:
+    case 'idle':
+      match new_status:
+        case 'patterning':
+          # change clear button to abort button
+          clear_button.config(
+            text='Abort',
+            bg='red',
+            fg='white',
+            command=lambda: change_patterning_status('aborting'))
+          clear_button.grid(rowspan=5)
+          # disable pattern button
+          pattern_button_timed.config(
+            command=lambda: None)
+          pattern_status = 'patterning'
+        case 'aborting':
+          debug.warn("invalid state transition: idle -> aborting")
+        case 'idle':
+          debug.warn("invalid state transition: idle -> idle")
+    case 'patterning':
+      match new_status:
+        case 'idle':
+          # normal transition, reset changes
+          clear_button.config(
+            text='Clear',
+            bg='black',
+            fg='white',
+            command=GUI.proj.clear)
+          clear_button.grid(rowspan=1)
+          # re-enable pattern button
+          pattern_button_timed.config(
+            command=begin_patterning)
+          pattern_status = 'idle'
+        case 'aborting':
+          # abort button was pressed while patterning, change global status and print warn
+          pattern_status = 'aborting'
+          GUI.proj.clear()
+          debug.warn("aborting patterning...")
+        case 'patterning':
+          debug.warn("invalid state transition: patterning -> patterning")
+    case 'aborting':
+      match new_status:
+        case 'idle':
+          # abort resolved, reset changes
+          clear_button.config(
+            text='Clear',
+            bg='black',
+            fg='white',
+            command=GUI.proj.clear)
+          clear_button.grid(rowspan=1)
+          # re-enable pattern button
+          pattern_button_timed.config(
+            command=begin_patterning)
+          pattern_status = 'idle'
+        case 'patterning':
+          debug.warn("invalid state transition: aborting -> patterning")
+        case 'aborting':
+          debug.warn("invalid state transition: aborting -> aborting")
+
+# big red danger button
+tile_number: int = 0
+def begin_patterning():
+  global pattern_status
+  debug.info("Slicing pattern...")
+  slicer.update(image=pattern_thumb.image,
+                horizontal_tiles=slicer_horiz_intput.get(),
+                vertical_tiles=slicer_vert_intput.get(),
+                output_resolution=GUI.proj.size())
+  pattern_progress['value'] = 0
+  pattern_progress['maximum'] = slicer.tile_count()
+  debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
+  change_patterning_status('patterning')
+  while True:
+    # prep
+    image: Image.Image
+    if(slicer.tile_count() == 1):
+      image = prep_pattern(pattern_thumb.temp_image, thumb=pattern_thumb)
+    else:
+      image = prep_pattern(slicer.image())
+    stage.lock()
+    #pattern
+    result = GUI.proj.show(image, duration=duration_intput.get())
+    if(result):
+      stage.unlock()
+    # repeat
+    if(pattern_status == 'aborting'):
+      pattern_progress['value'] = 0
+      debug.warn("Patterning aborted")
+      break
+    if(slicer.next()):
+      pattern_progress['value'] += 1
+      debug.info("Finished tile")
+    else:
+      pattern_progress['value'] = 0
+      debug.info("Done")
+      break
+  change_patterning_status('idle')
+    
+pattern_button_timed: Button = Button(
+  GUI.root,
+  text = 'Begin\nPatterning',
+  command = begin_patterning,
+  bg = 'red',
+  fg = 'white')
+pattern_button_timed.grid(
+  row = pattern_row+buttons_row+1,
+  column = pattern_col+buttons_col,
+  rowspan=4,
+  sticky='nesw')
+GUI.add_widget("pattern_button_timed", pattern_button_timed)
+
+# clear button has to come after to show ontop, annoying but inevitable
+clear_button: Button = Button(
+  GUI.root,
+  text = 'Clear',
+  bg='black',
+  fg='white',
+  command = GUI.proj.clear)
+clear_button.grid(
+  row = pattern_row+buttons_row,
+  column = pattern_col+buttons_col,
+  rowspan=1,
+  sticky='nesw')
+GUI.add_widget("clear_button", clear_button)
+
 
 #endregion
 

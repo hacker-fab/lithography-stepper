@@ -396,7 +396,7 @@ class Projector_Controller():
     # warn if image isn't correct size
     if(img_copy.size != fit_image(img_copy, self.size())):
       if(self.debug != None):
-        self.debug.warn("projecting image with incorrect size")
+        self.debug.warn("projecting image with incorrect size:\n  "+str(img_copy.size)+" instead of "+str(self.size()))
     photo: ImageTk.PhotoImage = rasterize(img_copy)
     self.__label__.config(image = photo)
     self.__label__.image = photo
@@ -732,7 +732,6 @@ class Slicer():
   __full_image__: Image.Image | None = None
   __sliced_images__: tuple[Image.Image,...] = ()
   __index__: int = 0
-  __default_image__: Image.Image = Image.new("RGB", (1,1))
   __pattern__: Literal['row major', 'col major', 'snake'] = 'snake'
   __horizontal_slices__: int = 1
   __vertical_slices__: int = 1
@@ -756,32 +755,55 @@ class Slicer():
     self.__pattern__ = tiling_pattern
     if(image != None):
       self.__full_image__ = image.copy()
-      self.__default_image__ = Image.new("RGB", image.size)
       (self.__grid_size__, self.__sliced_images__) = slice( self.__full_image__,
                                                             self.__horizontal_slices__,
                                                             self.__vertical_slices__,
                                                             self.__output_resolution__)
     self.debug = debug
   
-  def next(self) -> Image.Image:
-    if(self.__index__ >= len(self.__sliced_images__)):
-      if(self.debug != None):
-        self.debug.warn("called next at end of sliced image list")
-      return self.__default_image__
-    result: Image.Image 
+  #convert internal index counter to specified pattern index
+  def __convert_index__(self) -> int:
     match self.__pattern__:
       case 'row major':
-        result = self.__sliced_images__[self.__index__]
+        return self.__index__
       case 'col major':
-        result = self.__sliced_images__[self.__grid_size__[0]*(self.__index__ % self.__grid_size__[1]) + self.__index__ // self.__grid_size__[1]]
+        return self.__grid_size__[0]*(self.__index__ % self.__grid_size__[1]) + self.__index__ // self.__grid_size__[1]
       case 'snake':
         row: int = self.__index__ // self.__grid_size__[0]
         if(row % 2 == 0):
-          result = self.__sliced_images__[self.__index__]
+          return self.__index__
         else:
-          result = self.__sliced_images__[self.__grid_size__[0]*(row+1) - (self.__index__ % self.__grid_size__[0]) - 1]
-    self.__index__ += 1
+          return self.__grid_size__[0]*(row+1) - (self.__index__ % self.__grid_size__[0]) - 1
+    return 0
+  
+  # increment index, false if at end of list
+  def next(self, increment: int = 1) -> bool:
+    if(increment < 1):
+      return False
+    elif(self.__index__ + increment >= len(self.__sliced_images__)):
+      return False
+    else:
+      self.__index__ += increment
+      return True
+  
+  # decrement index, false if at beginning of list
+  def prev(self, decrement: int = 1) -> bool:
+    if(decrement < 1):
+      return False
+    elif(self.__index__ - decrement < 0):
+      return False
+    else:
+      self.__index__ -= decrement
+      return True
+  
+  # returns current image
+  def image(self) -> Image.Image:
+    result: Image.Image = self.__sliced_images__[self.__convert_index__()]
     return result
+  
+  # returns number of tiles
+  def tile_count(self) -> int:
+    return len(self.__sliced_images__)
   
   # update slicer parameters
   # will reset index, so calling with no args is equivalent to resetting 
@@ -789,7 +811,7 @@ class Slicer():
               image: Image.Image|None = None,
               horizontal_tiles: int = 1,
               vertical_tiles: int = 1,
-               output_resolution: tuple[int,int] = (0,0),
+              output_resolution: tuple[int,int] = (0,0),
               tiling_pattern: Literal['row major', 'col major', 'snake'] = 'snake'):
     
     reslice: bool = False
@@ -797,7 +819,6 @@ class Slicer():
     
     if(image!=None):
       self.__full_image__ = image.copy()
-      self.__default_image__ = Image.new("RGB", image.size)
       reslice = True
       
     if(self.__horizontal_slices__ != horizontal_tiles and horizontal_tiles >= 1):
