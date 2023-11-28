@@ -25,8 +25,10 @@ from litho_gui_lib import *
 #     of widget groups. see stage controls
 # - Make an interactive version of the help message popup, it's getting long
 # - make the "show" buttons change color while that pattern is being showed
+# - add secondary list in this file to store the modified tiled images similar to the "temp" and
+#     "original" images in the thumbnail widgets
 
-''' V1.3.0 Patch Notes
+''' V1.3.1 Patch Notes
 
 **Major**
 - Implemented slicer and stepping
@@ -63,6 +65,7 @@ SPACER_SIZE: int = GUI.window_size[0]//(GUI.grid_size[1]*5)
 # Debugger
 debug: Debug = Debug(root=GUI.root)
 GUI.add_widget("debug", debug)
+
 
 #region: functions
 
@@ -833,12 +836,20 @@ def begin_patterning():
   debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
   change_patterning_status('patterning')
   while True:
-    # prep
+    # get patterning image
     image: Image.Image
     if(slicer.tile_count() == 1):
       image = prep_pattern(pattern_thumb.temp_image, thumb=pattern_thumb)
     else:
       image = prep_pattern(slicer.image())
+    # set preview image
+    preview_image = rasterize(image.resize(THUMBNAIL_SIZE, Image.Resampling.LANCZOS))
+    current_tile_image.config(image=preview_image)
+    current_tile_image.image = preview_image
+    # TODO remove once camera is implemented
+    camera_image_preview = rasterize(image.resize((GUI.window_size[0],(GUI.window_size[0]*9)//16), Image.Resampling.LANCZOS))
+    camera.config(image=camera_image_preview)
+    camera.image = camera_image_preview
     stage.lock()
     #pattern
     result = GUI.proj.show(image, duration=duration_intput.get())
@@ -857,6 +868,12 @@ def begin_patterning():
       debug.info("Done")
       break
   change_patterning_status('idle')
+  # clear preview image
+  current_tile_image.config(image=tile_placeholder)
+  current_tile_image.image = tile_placeholder
+  # TODO remove once camera is implemented
+  camera.config(image=camera_placeholder)
+  camera.image = camera_placeholder
     
 pattern_button_timed: Button = Button(
   GUI.root,
@@ -884,7 +901,6 @@ clear_button.grid(
   rowspan=1,
   sticky='nesw')
 GUI.add_widget("clear_button", clear_button)
-
 
 #endregion
 
