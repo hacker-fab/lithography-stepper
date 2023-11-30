@@ -735,7 +735,6 @@ class Slicer():
   __pattern__: Literal['row major', 'col major', 'snake'] = 'snake'
   __horizontal_slices__: int = 1
   __vertical_slices__: int = 1
-  __output_resolution__: tuple[int,int] = (0,0)
   __grid_size__: tuple[int,int] = (0,0)
   debug: Debug | None
   
@@ -750,15 +749,12 @@ class Slicer():
       self.__horizontal_slices__ = horizontal_tiles
     if(vertical_tiles >= 1):
       self.__vertical_slices__ = vertical_tiles
-    if(output_resolution[0]>0 and output_resolution[1]>0):
-      self.__output_resolution__ = output_resolution
     self.__pattern__ = tiling_pattern
     if(image != None):
       self.__full_image__ = image.copy()
       (self.__grid_size__, self.__sliced_images__) = slice( self.__full_image__,
                                                             self.__horizontal_slices__,
-                                                            self.__vertical_slices__,
-                                                            self.__output_resolution__)
+                                                            self.__vertical_slices__)
     self.debug = debug
   
   #convert internal index counter to specified pattern index
@@ -829,16 +825,11 @@ class Slicer():
       self.__vertical_slices__ = vertical_tiles
       reslice = True  
     
-    if(output_resolution[0]>0 and output_resolution[1]>0):
-      self.__output_resolution__ = output_resolution
-      reslice = True
-    
     if(self.__pattern__ != tiling_pattern):
       self.__pattern__ = tiling_pattern
     
     if(reslice and self.__full_image__ != None):
       (self.__grid_size__, self.__sliced_images__) = slice( self.__full_image__,
                                                             self.__horizontal_slices__,
-                                                            self.__vertical_slices__,
-                                                            self.__output_resolution__)
+                                                            self.__vertical_slices__)
 

@@ -66,8 +66,7 @@ debug: Debug = Debug(root=GUI.root)
 GUI.add_widget("debug", debug)
 
 
-slicer: Slicer = Slicer(output_resolution=GUI.proj.size(),
-                        tiling_pattern='snake',
+slicer: Slicer = Slicer(tiling_pattern='snake',
                         debug=debug)
 
 #returns modified version of input image, optionally updates thumbnail with image
@@ -824,8 +823,7 @@ def begin_patterning():
   debug.info("Slicing pattern...")
   slicer.update(image=pattern_thumb.image,
                 horizontal_tiles=slicer_horiz_intput.get(),
-                vertical_tiles=slicer_vert_intput.get(),
-                output_resolution=GUI.proj.size())
+                vertical_tiles=slicer_vert_intput.get())
   pattern_progress['value'] = 0
   pattern_progress['maximum'] = slicer.tile_count()
   debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
