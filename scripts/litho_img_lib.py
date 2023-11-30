@@ -468,6 +468,7 @@ if(False):
   __timing_tests((3840,2160),50)
 
 # propt user for image
-image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
+# image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
 # for i in slice(image, vertical_tiles=2)[1]: i.show()
-better_transform(image, (0,0,0.2), (2000,500), 0.1).show()
+# better_transform(image, (0,0,0), (1500,1500), 0.2).show()
+# better_transform(image, (100,-50,1), (1500,1500), 0.2).save("test.png")
