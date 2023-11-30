@@ -11,6 +11,7 @@ from litho_gui_lib import *
 # - make stage move with tiling
 # - add a border field to options
 # - have the tile preview show _next_ tile, not current
+# - Fix squishing bug???
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -18,15 +19,13 @@ from litho_gui_lib import *
 # - add a button to show pure white image for flatfield correction
 # - fix bug where flatfield pattern is reapplied on second pattern show
 #     to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
-# - refactor widgets to be organized by category. see stage controls
-# - refactor grid location to be based off category offsets instead of asbolute for easier moving
-#     of widget groups. see stage controls
 # - Make an interactive version of the help message popup, it's getting long
 # - make the "show" buttons change color while that pattern is being showed
 # - add secondary list in this file to store the modified tiled images similar to the "temp" and
 #     "original" images in the thumbnail widgets
 
-''' V1.3.2 Patch Notes
+VERSION: str = "1.3.3"
+''' Patch Notes
 
 **Major**
 - Implemented slicer and stepping
@@ -40,6 +39,7 @@ from litho_gui_lib import *
 - backend refactoring
 - abort button is dynamic
 - added a progress bar for the total progress of the pattern
+- Increased UI feedback to user to reduce learning curve
 
 **For V2.0.0**
 - Add live camera feed
@@ -56,7 +56,7 @@ from litho_gui_lib import *
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 CHIN_SIZE: int = 400
 GUI: GUI_Controller = GUI_Controller(grid_size = (14,10),
-                                     title = "Lithographer V1.2.5",
+                                     title = "Lithographer "+VERSION,
                                      add_window_size=(0,CHIN_SIZE))
 SPACER_SIZE: int = GUI.window_size[0]//(GUI.grid_size[1]*5)
 # for row in range(GUI.grid_size[0]):
@@ -165,15 +165,22 @@ GUI.add_widget("exposure_progress", exposure_progress)
 debug.grid(GUI.grid_size[0]-1,0,colspan=GUI.grid_size[1]-1)
 
 help_text: str = """
+How do I move the projector window?
+- On Windows, click the projector window, then win + shift + arrow keys to move it to the second screen 
+- On Mac, no clue :P
+
+
 How do I import an image?
 - Just click on the black thumbnail and a dialog will open
   - The UI will try to fix images in the incorrect mode
   - The UI will reject incorrect file formats
+- The "show" buttons below the previews will show the image on the projector
 
 
-How do I move the projector window?
-- On Windows, click the projector window, then win + shift + arrow keys to move it to the second screen 
-- On Mac, no clue :P
+How do I use the stage controls?
+- You can type in coordinates, then press "set stage position" to move the stage
+- Or, you can use the step buttons on the GUI or the arrow keys on your keyboard (ctrl/shift+up/down for z axis)
+- You can also modify the step sizes for each axis. Those are applied immediately. 
 
 
 How do I use flatfield correction?
@@ -198,30 +205,18 @@ How do I use flatfield correction?
 
 Posterizer? I barely know her!
 - TL;DR, make pattern monochrome for sharper edges
-- What is posterizing?
-  - Posterizing is the process for reducing the bit depth of an image.
-  - For this GUI, it reduces the image to 1 bit depth or monochrome (not greyscale, only pure black and pure white)
 - What is that number next to it?
-  - The number next to the toggle is the cutoff value
+  - That is the cutoff value for what is considered white / black
   - Unless you're losing features or lines are growing / shrinking, leave it at 50
-  - It behaves as follows:
-    - 100 is max cutoff, so only pure white will stay white
-    -  50 is default, light greys will be white, and dark greys will be black
-    -   0 is min cutoff, so only pure black will stay black
-- What does this apply to?
-  - Patterning image
-  - Red focus image
-  - NOT UV focus image because it would just be solid black
-- What does it actually do?
-  - It makes all edges in the image perfectly sharp, improving the quality of the patterning.
-  - It's unlikely, but you may not need to use it if:
-    - Your pattern is RGB or L, and doesn't have an alpha channel
-    - Your pattern is already monochrome
-    - Your pattern is at exactly the projector's resolution. can't be even a single pixel off
-- What does this apply to?
-  - Patterning image
-  - Red focus image
-  - NOT UV focus image because it would just be solid black
+  - 100 is max cutoff, so only pure white will stay white
+  -  50 is default, light greys will be white, and dark greys will be black
+  -   0 is min cutoff, so only pure black will stay black
+  
+
+What are those tiling fields?
+- The left is how many columns, and the right is how many rows. 2,3 would be 2 wide and 3 tall
+- It is applied immediately, no need to do anything
+- The preview window shows the next tile to display
 
 
 Think something is missing? Have a suggestion?
@@ -256,6 +251,7 @@ def show_pattern_fixed() -> None:
   pattern_thumb.temp_image = prep_pattern(pattern_thumb.temp_image)
   debug.info("Showing Pattern")
   GUI.proj.show(pattern_thumb.temp_image)
+  pattern_button_fixed.config(bg="black", fg="white")
 pattern_button_fixed: Button = Button(
   GUI.root,
   text = 'Show Pattern',
@@ -761,6 +757,11 @@ def change_patterning_status(new_status: Literal['idle','patterning', 'aborting'
     case 'idle':
       match new_status:
         case 'patterning':
+          # reset all "show" buttons
+          pattern_button_fixed.config(bg="white", fg="black")
+          red_focus_button.config(bg="white", fg="black")
+          uv_focus_button.config(bg="white", fg="black")
+          flatfield_button.config(bg="white", fg="black")
           # change clear button to abort button
           clear_button.config(
             text='Abort',
@@ -784,7 +785,7 @@ def change_patterning_status(new_status: Literal['idle','patterning', 'aborting'
             text='Clear',
             bg='black',
             fg='white',
-            command=GUI.proj.clear)
+            command=clear_button_func)
           clear_button.grid(rowspan=1)
           # re-enable pattern button
           pattern_button_timed.config(
@@ -805,7 +806,7 @@ def change_patterning_status(new_status: Literal['idle','patterning', 'aborting'
             text='Clear',
             bg='black',
             fg='white',
-            command=GUI.proj.clear)
+            command=clear_button_func)
           clear_button.grid(rowspan=1)
           # re-enable pattern button
           pattern_button_timed.config(
@@ -828,7 +829,7 @@ def begin_patterning():
   pattern_progress['maximum'] = slicer.tile_count()
   debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
   change_patterning_status('patterning')
-  delta_vector: tuple[int,int,float] = (0,0,0)
+  # delta_vector: tuple[int,int,float] = (0,0,0)
   while True:
     # get patterning image
     image: Image.Image
@@ -837,7 +838,7 @@ def begin_patterning():
     else:
       image = prep_pattern(slicer.image())
     # apply fine adjustment vector to image
-    image = better_transform(image, delta_vector, GUI.proj.size(), 0.2)
+    # image = better_transform(image, delta_vector, GUI.proj.size(), 0.2)
     # set preview image
     preview_image = rasterize(image.resize(THUMBNAIL_SIZE, Image.Resampling.LANCZOS))
     current_tile_image.config(image=preview_image)
@@ -851,7 +852,6 @@ def begin_patterning():
     result = GUI.proj.show(image, duration=duration_intput.get())
     if(result):
       stage.unlock()
-      delta_vector = tuple(map(float, input("Next vector [dX dY theta]:").split(None,3)))
       # TODO remove once camera is implemented
       camera.config(image=camera_placeholder)
       camera.image = camera_placeholder
@@ -863,6 +863,8 @@ def begin_patterning():
     if(slicer.next()):
       pattern_progress['value'] += 1
       debug.info("Finished tile")
+      #TODO: implement CV
+      #delta_vector = tuple(map(float, input("Next vector [dX dY theta]:").split(None,3)))
     else:
       pattern_progress['value'] = 0
       debug.info("Done")
@@ -889,12 +891,20 @@ pattern_button_timed.grid(
 GUI.add_widget("pattern_button_timed", pattern_button_timed)
 
 # clear button has to come after to show ontop, annoying but inevitable
+def clear_button_func():
+  # reset all "show" buttons
+  pattern_button_fixed.config(bg="white", fg="black")
+  red_focus_button.config(bg="white", fg="black")
+  uv_focus_button.config(bg="white", fg="black")
+  flatfield_button.config(bg="white", fg="black")
+  GUI.proj.clear()
+
 clear_button: Button = Button(
   GUI.root,
   text = 'Clear',
   bg='black',
   fg='white',
-  command = GUI.proj.clear)
+  command = clear_button_func)
 clear_button.grid(
   row = pattern_row+buttons_row,
   column = pattern_col+buttons_col,
