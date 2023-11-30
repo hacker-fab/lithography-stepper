@@ -276,7 +276,7 @@ def better_transform(image: Image.Image,
   # next we need to scale image to the requested size
   inner_size: tuple[int,int] = (round(output_size[0]*(1-border)), 
                                 round(output_size[1]*(1-border)))
-  img_cpy = img_cpy.resize(inner_size, resample=Image.Resampling.LANCZOS)
+  img_cpy = img_cpy.resize(fit_image(image, inner_size), resample=Image.Resampling.LANCZOS)
   #endregion
 
   # first we want to compute the affine matrix to move the image to the center of the output
@@ -470,4 +470,4 @@ if(False):
 # propt user for image
 # image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
 # for i in slice(image, vertical_tiles=2)[1]: i.show()
-
+# better_transform(image, (0,0,0.2), (2000,500), 0.1).show()

@@ -878,8 +878,7 @@ def begin_patterning():
     else:
       image = prep_pattern(slicer.image())
     #TODO apply fine adjustment vector to image
-    # image = better_transform(image, delta_vector, GUI.proj.size(), 0.2)
-    # TODO remove once camera is implemented
+    #TODO remove once camera is implemented
     camera_image_preview = rasterize(image.resize(fit_image(image, (GUI.window_size[0],(GUI.window_size[0]*9)//16)), Image.Resampling.LANCZOS))
     camera.config(image=camera_image_preview)
     camera.image = camera_image_preview
