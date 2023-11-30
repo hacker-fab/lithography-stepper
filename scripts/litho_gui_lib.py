@@ -733,21 +733,20 @@ class Slicer():
   __sliced_images__: tuple[Image.Image,...] = ()
   __index__: int = 0
   __pattern__: Literal['row major', 'col major', 'snake'] = 'snake'
-  __horizontal_slices__: int = 1
-  __vertical_slices__: int = 1
+  __horizontal_slices__: int = 0
+  __vertical_slices__: int = 0
   __grid_size__: tuple[int,int] = (0,0)
   debug: Debug | None
   
   def __init__(self, 
                image: Image.Image|None = None, 
-               horizontal_tiles: int = 1,
-               vertical_tiles: int = 1,
-               output_resolution: tuple[int,int] = (0,0),
+               horizontal_tiles: int = 0,
+               vertical_tiles: int = 0,
                tiling_pattern: Literal['row major', 'col major', 'snake'] = 'snake',
                debug: Debug | None = None):
-    if(horizontal_tiles >= 1):
+    if(horizontal_tiles >= 0):
       self.__horizontal_slices__ = horizontal_tiles
-    if(vertical_tiles >= 1):
+    if(vertical_tiles >= 0):
       self.__vertical_slices__ = vertical_tiles
     self.__pattern__ = tiling_pattern
     if(image != None):
@@ -758,18 +757,20 @@ class Slicer():
     self.debug = debug
   
   #convert internal index counter to specified pattern index
-  def __convert_index__(self) -> int:
+  def __convert_index__(self, index: int = -1) -> int:
+    if(index == -1):
+      index = self.__index__
     match self.__pattern__:
       case 'row major':
-        return self.__index__
+        return index
       case 'col major':
-        return self.__grid_size__[0]*(self.__index__ % self.__grid_size__[1]) + self.__index__ // self.__grid_size__[1]
+        return self.__grid_size__[0]*(index % self.__grid_size__[1]) + index // self.__grid_size__[1]
       case 'snake':
-        row: int = self.__index__ // self.__grid_size__[0]
+        row: int = index // self.__grid_size__[0]
         if(row % 2 == 0):
-          return self.__index__
+          return index
         else:
-          return self.__grid_size__[0]*(row+1) - (self.__index__ % self.__grid_size__[0]) - 1
+          return self.__grid_size__[0]*(row+1) - (index % self.__grid_size__[0]) - 1
     return 0
   
   # increment index, false if at end of list
@@ -797,17 +798,28 @@ class Slicer():
     result: Image.Image = self.__sliced_images__[self.__convert_index__()]
     return result
   
+  # returns next image, if possible, without incrementing index
+  def peek(self) -> Image.Image | None:
+    result = None
+    if(self.next()):
+      result = self.image()
+      self.prev()
+    return result
+  
   # returns number of tiles
   def tile_count(self) -> int:
     return len(self.__sliced_images__)
+  
+  # rests tile index to 0
+  def restart(self):
+    self.__index__ = 0
   
   # update slicer parameters
   # will reset index, so calling with no args is equivalent to resetting 
   def update( self, 
               image: Image.Image|None = None,
-              horizontal_tiles: int = 1,
-              vertical_tiles: int = 1,
-              output_resolution: tuple[int,int] = (0,0),
+              horizontal_tiles: int = 0,
+              vertical_tiles: int = 0,
               tiling_pattern: Literal['row major', 'col major', 'snake'] = 'snake'):
     
     reslice: bool = False
@@ -817,17 +829,17 @@ class Slicer():
       self.__full_image__ = image.copy()
       reslice = True
       
-    if(self.__horizontal_slices__ != horizontal_tiles and horizontal_tiles >= 1):
+    if(self.__horizontal_slices__ != horizontal_tiles and horizontal_tiles >= 0):
       self.__horizontal_slices__ = horizontal_tiles
       reslice = True
     
-    if(self.__vertical_slices__ != vertical_tiles and vertical_tiles >= 1):
+    if(self.__vertical_slices__ != vertical_tiles and vertical_tiles >= 0):
       self.__vertical_slices__ = vertical_tiles
       reslice = True  
     
     if(self.__pattern__ != tiling_pattern):
       self.__pattern__ = tiling_pattern
-    
+      
     if(reslice and self.__full_image__ != None):
       (self.__grid_size__, self.__sliced_images__) = slice( self.__full_image__,
                                                             self.__horizontal_slices__,

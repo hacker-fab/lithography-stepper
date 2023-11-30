@@ -288,37 +288,38 @@ def better_transform(image: Image.Image,
   
 # slices image into parts
 def slice(image: Image.Image,
-          horizontal_tiles: int = 1,
-          vertical_tiles: int = 1,
+          horizontal_tiles: int = 0,
+          vertical_tiles: int = 0,
           output_resolution: tuple[int,int] = (0,0)
           ) -> tuple[tuple[int,int],tuple[Image.Image,...]]:
   
   # if no parameters specified, return original image
-  if(horizontal_tiles <= 1 and vertical_tiles <= 1 and output_resolution == (0,0)):
+  if(horizontal_tiles <= 0 and vertical_tiles <= 0 and output_resolution == (0,0)):
     return ((1,1),(image.copy(),))
 
   input_ratio: float = image.size[0] / image.size[1]
   output_ratio: float
   if(output_resolution == (0,0)):
-    output_ratio = horizontal_tiles / vertical_tiles
+    output_ratio = image.size[0] / image.size[1]
   else:
     output_ratio = output_resolution[0] / output_resolution[1]
     
   grid: tuple[int,int]
   slice_size: tuple[int,int]
-  if(horizontal_tiles > 1 and vertical_tiles > 1):
+  if(horizontal_tiles > 0 and vertical_tiles > 0):
     # both specified, make this the new ratio
     output_ratio = horizontal_tiles / vertical_tiles
     grid = (horizontal_tiles, vertical_tiles)
     slice_size = (ceil(image.size[0]/horizontal_tiles), ceil(image.size[1]/vertical_tiles))
-  elif(horizontal_tiles <= 1 and vertical_tiles <= 1):
+  elif(horizontal_tiles <= 0 and vertical_tiles <= 0):
+    # neither specified, use output resolution
     grid = (ceil(image.size[0]/output_resolution[0]), ceil(image.size[1]/output_resolution[1]))
     slice_size = output_resolution
-  elif(horizontal_tiles > 1):
+  elif(horizontal_tiles > 0):
     temp: float = input_ratio * 1/output_ratio * horizontal_tiles
     grid = (ceil(temp), horizontal_tiles)
     slice_size = (ceil(image.size[0]/temp), ceil(image.size[1]/horizontal_tiles))
-  elif(vertical_tiles > 1):
+  elif(vertical_tiles > 0):
     temp: float = output_ratio * 1/input_ratio * vertical_tiles
     grid = (vertical_tiles, ceil(temp))
     slice_size = (ceil(image.size[0]/vertical_tiles), ceil(image.size[1]/temp))

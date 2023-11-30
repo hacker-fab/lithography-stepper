@@ -1,17 +1,17 @@
-from tkinter import Tk, Button, Toplevel, Entry, IntVar, Variable, filedialog, Label, Text
+from tkinter import Button, Label
 from tkinter.ttk import Progressbar
-from PIL import ImageTk, Image
+from PIL import  Image
+from time import sleep
 from litho_img_lib import *
 from litho_gui_lib import *
 
 # TODO
-# - update the help message to include stage stuff
-# - make camera (and thumbnails ideally) auto resize images / have images fill the widget
-# - integrate CV to be able to control tiling
-# - make stage move with tiling
-# - add a border field to options
-# - have the tile preview show _next_ tile, not current
-# - Fix squishing bug???
+# - Camera Integration
+#     make camera (and thumbnails ideally) auto resize images / have images fill the widget
+# - CV Integration
+#     Make CV control the stage and patterning
+# - Stage integration
+#     Make stage move with stage controls and tiling
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -20,11 +20,12 @@ from litho_gui_lib import *
 # - fix bug where flatfield pattern is reapplied on second pattern show
 #     to reproduce, import flatfield and pattern, enable posterize and flatfield, press show twice
 # - Make an interactive version of the help message popup, it's getting long
-# - make the "show" buttons change color while that pattern is being showed
 # - add secondary list in this file to store the modified tiled images similar to the "temp" and
-#     "original" images in the thumbnail widgets
+#     "original" images in the thumbnail widgets. This would speed up repeat patternings
+# - Add user controllable tile adjustment and continue
+# - use a paste command to put the preview on a black background to represent the actual exposure. 
 
-VERSION: str = "1.3.3"
+VERSION: str = "1.4.2"
 ''' Patch Notes
 
 **Major**
@@ -42,16 +43,11 @@ VERSION: str = "1.3.3"
 - Increased UI feedback to user to reduce learning curve
 
 **For V2.0.0**
-- Add live camera feed
-- Integrate with CV
-- Integrate with stage
-
-**Nerd Stuff**
-- Refactored the widgets to be organized by category.
- - This is significantly easier to move and modify the layout of the full UI
+- Integrate camera feed
+- Integrate CV
+- Integrate stage
 
 '''
-
 
 THUMBNAIL_SIZE: tuple[int,int] = (160,90)
 CHIN_SIZE: int = 400
@@ -213,10 +209,10 @@ Posterizer? I barely know her!
   -   0 is min cutoff, so only pure black will stay black
   
 
-What are those tiling fields?
-- The left is how many columns, and the right is how many rows. 2,3 would be 2 wide and 3 tall
-- It is applied immediately, no need to do anything
-- The preview window shows the next tile to display
+What are those tiling fields? and why are they zero?
+- They are zero by default because zero is the keyword for "auto calculate". It's recommended to always leave at least one as zero
+- The left is how many columns, and the right is how many rows.
+- The preview window shows the next tile that will be displayed
 
 
 Think something is missing? Have a suggestion?
@@ -239,19 +235,48 @@ help_popup.grid(GUI.grid_size[0]-1,GUI.grid_size[1]-1)
 import_row: int = 3
 import_col: int = 0
 
+def highlight_button(button: Button)-> None:
+  if(button == pattern_button_fixed):
+    pattern_button_fixed.config(bg="black", fg="white")
+  else:
+    pattern_button_fixed.config(bg="white", fg="black")
+  if(button == red_focus_button):
+    red_focus_button.config(bg="black", fg="white")
+  else:
+    red_focus_button.config(bg="white", fg="black")
+  if(button == uv_focus_button):
+    uv_focus_button.config(bg="black", fg="white")
+  else:
+    uv_focus_button.config(bg="white", fg="black")
+  if(button == flatfield_button):
+    flatfield_button.config(bg="black", fg="white")
+  else:
+    flatfield_button.config(bg="white", fg="black")
+
 #region: Pattern
-pattern_thumb: Thumbnail = Thumbnail(root=GUI.root,
-                                     thumb_size=THUMBNAIL_SIZE,
-                                     debug=debug)
+def pattern_import_func() -> None:
+  slicer.update(image=pattern_thumb.image,
+                horizontal_tiles=slicer_horiz_intput.get(),
+                vertical_tiles=slicer_vert_intput.get())
+  pattern_thumb.temp_image = prep_pattern(slicer.image())
+  raster = rasterize(pattern_thumb.temp_image.resize(fit_image(pattern_thumb.temp_image, THUMBNAIL_SIZE), Image.Resampling.LANCZOS))
+  next_tile_image.config(image=raster)
+  next_tile_image.image = raster
+  
+pattern_thumb: Thumbnail = Thumbnail(
+  root=GUI.root,
+  thumb_size=THUMBNAIL_SIZE,
+  func_on_success=pattern_import_func,
+  debug=debug)
 pattern_thumb.grid(import_row,import_col, rowspan=4)
 GUI.add_widget("pattern_thumb", pattern_thumb)
 
 
 def show_pattern_fixed() -> None:
+  highlight_button(pattern_button_fixed)
   pattern_thumb.temp_image = prep_pattern(pattern_thumb.temp_image)
   debug.info("Showing Pattern")
   GUI.proj.show(pattern_thumb.temp_image)
-  pattern_button_fixed.config(bg="black", fg="white")
 pattern_button_fixed: Button = Button(
   GUI.root,
   text = 'Show Pattern',
@@ -279,6 +304,7 @@ flatfield_thumb.grid(import_row,import_col+1, rowspan=4)
 GUI.add_widget("flatfield_thumb", flatfield_thumb)
 
 def show_flatfield() -> None:
+  highlight_button(flatfield_button)
   # resizeing
   image: Image.Image = flatfield_thumb.temp_image
   if(image.size != fit_image(image, GUI.proj.size())):
@@ -307,6 +333,7 @@ red_focus_thumb.grid(import_row+5,import_col, rowspan=4)
 GUI.add_widget("red_focus_thumb", red_focus_thumb)
 
 def show_red_focus() -> None:
+  highlight_button(red_focus_button)
   # posterizeing
   image: Image.Image = red_focus_thumb.temp_image
   if(posterize_toggle.state and (image.mode != 'L' or post_strength_intput.changed())):
@@ -343,6 +370,7 @@ uv_focus_thumb.grid(import_row+5,import_col+1, rowspan=4)
 GUI.add_widget("uv_focus_thumb", uv_focus_thumb)
 
 def show_uv_focus() -> None:
+  highlight_button(uv_focus_button)
   # resizeing
   image: Image.Image = uv_focus_thumb.temp_image
   if(image.size != fit_image(image, GUI.proj.size())):
@@ -631,8 +659,8 @@ GUI.add_widget("slicer_horiz_text", slicer_horiz_text)
 slicer_horiz_intput: Intput = Intput(
   root=GUI.root,
   name="Slicer Horiz",
-  default=1,
-  min=1,
+  default=0,
+  min=0,
   debug=debug
 )
 slicer_horiz_intput.grid(pattern_row+options_row+2,pattern_col+options_col+1)
@@ -641,8 +669,8 @@ GUI.add_widget("slicer_horiz_intput", slicer_horiz_intput)
 slicer_vert_intput: Intput = Intput(
   root=GUI.root,
   name="Slicer Vert",
-  default=1,
-  min=1,
+  default=0,
+  min=0,
   debug=debug
 )
 slicer_vert_intput.grid(pattern_row+options_row+2,pattern_col+options_col+2)
@@ -718,7 +746,7 @@ current_tile_col = 0
 
 Current_tile_text: Label = Label(
   GUI.root,
-  text = "Current Tile",
+  text = "Next Pattern Image",
   
 )
 Current_tile_text.grid(
@@ -730,13 +758,13 @@ Current_tile_text.grid(
 GUI.add_widget("Current_tile_text", Current_tile_text)
 
 tile_placeholder = rasterize(Image.new('RGB', THUMBNAIL_SIZE, (0,0,0)))
-current_tile_image: Label = Label(
+next_tile_image: Label = Label(
   GUI.root,
   image = tile_placeholder,
   justify = 'center',
   anchor = 'center'
 )
-current_tile_image.grid(
+next_tile_image.grid(
   row = pattern_row+current_tile_row+1,
   column = pattern_col+current_tile_col,
   rowspan=4,
@@ -820,6 +848,15 @@ def change_patterning_status(new_status: Literal['idle','patterning', 'aborting'
 # big red danger button
 tile_number: int = 0
 def begin_patterning():
+  def update_next_tile_preview():
+    preview: Image.Image | None = slicer.peek()
+    if(preview == None):
+      preview = Image.new('RGB', THUMBNAIL_SIZE)
+    else:
+      preview = prep_pattern(preview)
+    raster = rasterize(preview.resize(fit_image(preview, THUMBNAIL_SIZE), Image.Resampling.LANCZOS))
+    next_tile_image.config(image=raster)
+    next_tile_image.image = raster
   global pattern_status
   debug.info("Slicing pattern...")
   slicer.update(image=pattern_thumb.image,
@@ -829,22 +866,21 @@ def begin_patterning():
   pattern_progress['maximum'] = slicer.tile_count()
   debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
   change_patterning_status('patterning')
+  # TODO implement fine adjustment with CV
   # delta_vector: tuple[int,int,float] = (0,0,0)
   while True:
+    # update next tile preview
+    update_next_tile_preview()
     # get patterning image
     image: Image.Image
     if(slicer.tile_count() == 1):
       image = prep_pattern(pattern_thumb.temp_image, thumb=pattern_thumb)
     else:
       image = prep_pattern(slicer.image())
-    # apply fine adjustment vector to image
+    #TODO apply fine adjustment vector to image
     # image = better_transform(image, delta_vector, GUI.proj.size(), 0.2)
-    # set preview image
-    preview_image = rasterize(image.resize(THUMBNAIL_SIZE, Image.Resampling.LANCZOS))
-    current_tile_image.config(image=preview_image)
-    current_tile_image.image = preview_image
     # TODO remove once camera is implemented
-    camera_image_preview = rasterize(image.resize((GUI.window_size[0],(GUI.window_size[0]*9)//16), Image.Resampling.LANCZOS))
+    camera_image_preview = rasterize(image.resize(fit_image(image, (GUI.window_size[0],(GUI.window_size[0]*9)//16)), Image.Resampling.LANCZOS))
     camera.config(image=camera_image_preview)
     camera.image = camera_image_preview
     #pattern
@@ -866,17 +902,22 @@ def begin_patterning():
       #TODO: implement CV
       #delta_vector = tuple(map(float, input("Next vector [dX dY theta]:").split(None,3)))
     else:
-      pattern_progress['value'] = 0
-      debug.info("Done")
       break
+    #TODO: delete this pause. This is to "simulate" the CV taking time to move the stage
+    sleep(0.5)
+  # return to idle state
   change_patterning_status('idle')
-  # clear preview image
-  current_tile_image.config(image=tile_placeholder)
-  current_tile_image.image = tile_placeholder
+  # restart slicer
+  slicer.restart()
+  # update next tile preview
+  update_next_tile_preview()
   # TODO remove once camera is implemented
   camera.config(image=camera_placeholder)
   camera.image = camera_placeholder
-    
+  # give user feedback
+  pattern_progress['value'] = 0
+  debug.info("Done")
+  
 pattern_button_timed: Button = Button(
   GUI.root,
   text = 'Begin\nPatterning',
