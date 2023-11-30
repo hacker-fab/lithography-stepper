@@ -580,7 +580,7 @@ class GUI_Controller():
   
   def mainloop(self):
     self.root.mainloop()
-  
+
 # TODO add theta?
 # TODO make floats?
 # TODO add changed() function
@@ -607,7 +607,7 @@ class Stage_Controller():
     self.step_size = step_sizes
     self.debug = debug
     self.__verbosity__ = verbosity
-    
+  
   def __str2key__(self, axis: str) -> Literal['x','y','z','any'] | None:
     match axis[-1]:
       case 'x':
@@ -726,7 +726,7 @@ class Stage_Controller():
       self.debug.info(debug_str)
     #endregion
   #endregion
-  
+ 
 # Class takes an image and slicing parameters and returns slices
 class Slicer():
   __full_image__: Image.Image | None = None
@@ -841,7 +841,4 @@ class Slicer():
                                                             self.__horizontal_slices__,
                                                             self.__vertical_slices__,
                                                             self.__output_resolution__)
-      
 
-    
-  

@@ -5,14 +5,12 @@ from litho_img_lib import *
 from litho_gui_lib import *
 
 # TODO
-# - spot for "entire layer" image
-# - spot for "current tile" image
 # - update the help message to include stage stuff
-# - add a progress bar for total progress (tiles left / total tiles)
 # - make camera (and thumbnails ideally) auto resize images / have images fill the widget
-# - make the big red "begin patterning" button change color while patterning
-# - when a tile of the pattern is finished, change it back to red and say "override"
-# - add pause when tiling to allow cv to move around
+# - integrate CV to be able to control tiling
+# - make stage move with tiling
+# - add a border field to options
+# - have the tile preview show _next_ tile, not current
 # 
 # Low Priority
 # - an image showing live camera output (I'll just set the image and it will update basically)
@@ -28,7 +26,7 @@ from litho_gui_lib import *
 # - add secondary list in this file to store the modified tiled images similar to the "temp" and
 #     "original" images in the thumbnail widgets
 
-''' V1.3.1 Patch Notes
+''' V1.3.2 Patch Notes
 
 **Major**
 - Implemented slicer and stepping
@@ -40,12 +38,13 @@ from litho_gui_lib import *
  - Can now move stage with the arrow keys: up/down/left/right for xy and ctrl or shift + up/down for z axis
 - Yet another large layout redesign
 - backend refactoring
-- abort button is dynamic now
+- abort button is dynamic
 - added a progress bar for the total progress of the pattern
 
 **For V2.0.0**
 - Add live camera feed
 - Integrate with CV
+- Integrate with stage
 
 **Nerd Stuff**
 - Refactored the widgets to be organized by category.
@@ -66,8 +65,6 @@ SPACER_SIZE: int = GUI.window_size[0]//(GUI.grid_size[1]*5)
 debug: Debug = Debug(root=GUI.root)
 GUI.add_widget("debug", debug)
 
-
-#region: functions
 
 slicer: Slicer = Slicer(output_resolution=GUI.proj.size(),
                         tiling_pattern='snake',
@@ -121,8 +118,6 @@ def prep_pattern(input_image: Image.Image, thumb: Thumbnail | None = None) -> Im
   
   update_thumb()
   return image
-
-#endregion
 
 #region: Camera and progress bars
 camera_placeholder = rasterize(Image.new('RGB', (GUI.window_size[0],(GUI.window_size[0]*9)//16), (0,0,0)))
@@ -835,6 +830,7 @@ def begin_patterning():
   pattern_progress['maximum'] = slicer.tile_count()
   debug.info("Patterning "+str(slicer.tile_count())+" tiles for "+str(duration_intput.get())+"ms \n  Total time: "+str(round((slicer.tile_count()*duration_intput.get())/1000))+"s")
   change_patterning_status('patterning')
+  delta_vector: tuple[int,int,float] = (0,0,0)
   while True:
     # get patterning image
     image: Image.Image
@@ -842,6 +838,8 @@ def begin_patterning():
       image = prep_pattern(pattern_thumb.temp_image, thumb=pattern_thumb)
     else:
       image = prep_pattern(slicer.image())
+    # apply fine adjustment vector to image
+    image = better_transform(image, delta_vector, GUI.proj.size(), 0.2)
     # set preview image
     preview_image = rasterize(image.resize(THUMBNAIL_SIZE, Image.Resampling.LANCZOS))
     current_tile_image.config(image=preview_image)
@@ -850,11 +848,15 @@ def begin_patterning():
     camera_image_preview = rasterize(image.resize((GUI.window_size[0],(GUI.window_size[0]*9)//16), Image.Resampling.LANCZOS))
     camera.config(image=camera_image_preview)
     camera.image = camera_image_preview
-    stage.lock()
     #pattern
+    stage.lock()
     result = GUI.proj.show(image, duration=duration_intput.get())
     if(result):
       stage.unlock()
+      delta_vector = tuple(map(float, input("Next vector [dX dY theta]:").split(None,3)))
+      # TODO remove once camera is implemented
+      camera.config(image=camera_placeholder)
+      camera.image = camera_placeholder
     # repeat
     if(pattern_status == 'aborting'):
       pattern_progress['value'] = 0

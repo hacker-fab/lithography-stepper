@@ -266,7 +266,6 @@ def better_transform(image: Image.Image,
                      output_size: tuple[int,int],
                      border: float
                      ) -> Image.Image:
-  start = time()
   final_image: Image.Image = Image.new("RGB", output_size)
   img_cpy: Image.Image = image.copy()
   
