@@ -883,29 +883,28 @@ def begin_patterning():
     camera.config(image=camera_image_preview)
     camera.image = camera_image_preview
     #pattern
+    if(pattern_status == 'aborting'):
+      break
     stage.lock()
+    debug.info("Patterning tile...")
     result = GUI.proj.show(image, duration=duration_intput.get())
+    stage.unlock()
+    if(pattern_status == 'aborting'):
+      break
     if(result):
-      stage.unlock()
       # TODO remove once camera is implemented
       camera.config(image=camera_placeholder)
       camera.image = camera_placeholder
     # repeat
-    if(pattern_status == 'aborting'):
-      pattern_progress['value'] = 0
-      debug.warn("Patterning aborted")
-      break
     if(slicer.next()):
       pattern_progress['value'] += 1
-      debug.info("Finished tile")
+      debug.info("Finished")
       #TODO: implement CV
       #delta_vector = tuple(map(float, input("Next vector [dX dY theta]:").split(None,3)))
     else:
       break
     #TODO: delete this pause. This is to "simulate" the CV taking time to move the stage
     sleep(0.5)
-  # return to idle state
-  change_patterning_status('idle')
   # restart slicer
   slicer.restart()
   # update next tile preview
@@ -915,7 +914,12 @@ def begin_patterning():
   camera.image = camera_placeholder
   # give user feedback
   pattern_progress['value'] = 0
-  debug.info("Done")
+  if(pattern_status == 'aborting'):
+    debug.warn("Patterning aborted")
+  else:
+    debug.info("Done")
+  # return to idle state
+  change_patterning_status('idle')
   
 pattern_button_timed: Button = Button(
   GUI.root,
