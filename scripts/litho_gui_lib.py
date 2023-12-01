@@ -174,13 +174,24 @@ class Thumbnail():
   
   # prompt user for a new image
   def __import_image__(self):
+    def is_valid_ext(path: str) -> bool:
+      ext: str = path[-5:].lower()
+      match ext[-4:]:
+        case ".jpg":
+          return True
+        case ".png":
+          return True
+      match ext[-5:]:
+        case ".jpeg":
+          return True
+      return False
     # get image
     path: str = filedialog.askopenfilename(title ='Open')
     if(self.debug != None):
       if(path == ''):
         self.debug.warn(self.text+(" " if self.text!="" else "")+"import cancelled")
         return
-      if(path[-4] != "." or not (path[-3:] == "jpg" or path[-3:] == "png")):
+      if(not is_valid_ext(path)):
         self.debug.error(self.text+" invalid file type: "+path[-3:])
         return
       else:

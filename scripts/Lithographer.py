@@ -25,7 +25,7 @@ from litho_gui_lib import *
 # - Add user controllable tile adjustment and continue
 # - use a paste command to put the preview on a black background to represent the actual exposure. 
 
-VERSION: str = "1.4.2"
+VERSION: str = "1.4.4"
 ''' Patch Notes
 
 **Major**

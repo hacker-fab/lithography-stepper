@@ -75,7 +75,7 @@ def center_crop(image: Image.Image, crop_size: tuple[int,int]) -> Image.Image:
 # convert a value on one scale to the same location on another scale
 def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
     if(old_scale[0] == old_scale[1]):
-      value = old_scale[0]
+      return new_scale[1]
     assert(old_scale[0] <= old_scale[1])
     if(new_scale[0] == new_scale[1]):
       return new_scale[0]
