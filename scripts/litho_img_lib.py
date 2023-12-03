@@ -1,8 +1,9 @@
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from PIL.ImageOps import invert
-from math import ceil
-from random import randint
+from math import ceil, cos, sin, radians
+from typing import Literal
+from math import pi
 
 # return max image size that will fit in [win_size] without cropping
 def fit_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
@@ -34,21 +35,6 @@ def fill_image(image: Image.Image, win_size: tuple[int,int]) -> tuple[int,int]:
   else:
     # same ratio
     return win_size
-
-
-# convert a value on one scale to the same location on another scale
-def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
-    if(old_scale[0] == old_scale[1]):
-      value = old_scale[0]
-    assert(old_scale[0] <= old_scale[1])
-    if(new_scale[0] == new_scale[1]):
-      return new_scale[0]
-    assert(new_scale[0] < new_scale[1])
-    # get % into the scale
-    d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
-    # convert to second scale
-    return round((d * (new_scale[1]-new_scale[0])) + new_scale[0])
-
 
 # return a center cropped version of image at desired resolution
 # example: if size == window then this will fill and crop image to window
@@ -86,6 +72,20 @@ def center_crop(image: Image.Image, crop_size: tuple[int,int]) -> Image.Image:
   # done
   return cropped
 
+# convert a value on one scale to the same location on another scale
+def rescale_value(old_scale: tuple[int,int], new_scale: tuple[int,int], value: int) -> int:
+    if(old_scale[0] == old_scale[1]):
+      return new_scale[1]
+    assert(old_scale[0] <= old_scale[1])
+    if(new_scale[0] == new_scale[1]):
+      return new_scale[0]
+    assert(new_scale[0] < new_scale[1])
+    # get % into the scale
+    d = (value - old_scale[0]) / (old_scale[1] - old_scale[0])
+    # convert to second scale
+    return round((d * (new_scale[1]-new_scale[0])) + new_scale[0])
+
+# yeah would work but the 
 
 # return the max and min brightness values of an image
 # optionally specify downsampling target
@@ -229,6 +229,134 @@ def dec_to_alpha(dec: int) -> tuple[int,int]:
 def alpha_to_dec(alpha: tuple[int,int]) -> int:
   return int(((510-alpha[0]-alpha[1])*100)/510)
 
+# given an x, y, and theta transform, return tuple (a,b,c,d,e,f)
+# representing the following affine matrix
+# | a b c |
+# | d e f |
+# | 0 0 1 |
+# theta is a tuple of format (x distance to origin, y distance to origin, rotation in radians)
+def build_affine(x: float = 0, y: float = 0, theta: None | tuple[int,int,float] = None) -> tuple[float,...]:
+  if(theta == None or theta[2] == 0):
+    # nice, simple translation matrix :)
+    return (1, 0, x, 0, 1, y)
+  else:
+    # horribly ugly translation and rotation around center matrix :(
+    # in order, translate to origin, rotate, translate back, translate by xy
+    #{{Cos[θ], -Sin[θ], a - a Cos[θ] + x Cos[θ] + b Sin[θ] - y Sin[θ]}, {Sin[θ], Cos[θ], b - b Cos[θ] + y Cos[θ] - a Sin[θ] + x Sin[θ]}, {0, 0, 1}}
+    theta = (theta[0], theta[1], -theta[2])
+    dx: int = theta[0]
+    dy: int = theta[1]
+    r:  float = theta[2]
+    return (cos(r), -sin(r), dx - dx*cos(r) + x*cos(r) + dy*sin(r) - y*sin(r), sin(r), cos(r), dy - dy*cos(r) + y*cos(r) - dx*sin(r) + x*sin(r))
+
+# Summary:
+#   transforms input image by x, y, and theta within new output sized image with
+#   specified border size.
+# Inputs:
+#   [image] is the input image to be transformed
+#   [vector] is of format (x, y, theta) with x and y being in pixels and theta in *RADS*
+#   [output_size] is the size of the output image in pixels
+#   [border] is a percentage of output image size.
+#     Can specify distinct (x, y) percentages, or just one to apply to both. for a 100x100 image:
+#     0% border would be 100x100
+#     50% border would be 50x50 (25% off each side)
+#     100% border would display zero pixels of image
+def better_transform(image: Image.Image,
+                     vector: tuple[int, int, float],
+                     output_size: tuple[int,int],
+                     border: float
+                     ) -> Image.Image:
+  final_image: Image.Image = Image.new("RGB", output_size)
+  img_cpy: Image.Image = image.copy()
+  
+  #region: prepare image
+  # if border is 100%, return a black image
+  if(border >= 100):
+    return final_image
+  # next we need to scale image to the requested size
+  fit_size: tuple[int,int] = fit_image(image, (round(output_size[0]*(1-border)), 
+                                round(output_size[1]*(1-border))))
+  img_cpy = img_cpy.resize(fit_size, resample=Image.Resampling.LANCZOS)
+  #endregion
+
+  # first we want to compute the affine matrix to move the image to the center of the output
+  affine_matrix: tuple[float,...] = build_affine(-vector[0]-(output_size[0]-fit_size[0])//2,
+                                                 vector[1]-(output_size[1]-fit_size[1])//2,
+                                                (fit_size[0]//2, fit_size[1]//2, -vector[2]))
+  img_cpy = Image.Image.transform(img_cpy, output_size, Image.Transform.AFFINE, affine_matrix, resample=Image.Resampling.BICUBIC, fillcolor="black")
+  return img_cpy
+  
+# slices image into parts
+def slice(image: Image.Image,
+          horizontal_tiles: int = 0,
+          vertical_tiles: int = 0,
+          output_resolution: tuple[int,int] = (0,0)
+          ) -> tuple[tuple[int,int],tuple[Image.Image,...]]:
+  
+  # if no parameters specified, return original image
+  if(horizontal_tiles <= 0 and vertical_tiles <= 0 and output_resolution == (0,0)):
+    return ((1,1),(image.copy(),))
+
+  input_ratio: float = image.size[0] / image.size[1]
+  output_ratio: float
+  if(output_resolution == (0,0)):
+    output_ratio = image.size[0] / image.size[1]
+  else:
+    output_ratio = output_resolution[0] / output_resolution[1]
+    
+  grid: tuple[int,int]
+  slice_size: tuple[int,int]
+  if(horizontal_tiles > 0 and vertical_tiles > 0):
+    # both specified, make this the new ratio
+    output_ratio = horizontal_tiles / vertical_tiles
+    grid = (horizontal_tiles, vertical_tiles)
+    slice_size = (ceil(image.size[0]/horizontal_tiles), ceil(image.size[1]/vertical_tiles))
+  elif(horizontal_tiles <= 0 and vertical_tiles <= 0):
+    # neither specified, use output resolution
+    grid = (ceil(image.size[0]/output_resolution[0]), ceil(image.size[1]/output_resolution[1]))
+    slice_size = output_resolution
+  elif(horizontal_tiles > 0):
+    temp: float = input_ratio * 1/output_ratio * horizontal_tiles
+    grid = (ceil(temp), horizontal_tiles)
+    slice_size = (ceil(image.size[0]/temp), ceil(image.size[1]/horizontal_tiles))
+  elif(vertical_tiles > 0):
+    temp: float = output_ratio * 1/input_ratio * vertical_tiles
+    grid = (vertical_tiles, ceil(temp))
+    slice_size = (ceil(image.size[0]/vertical_tiles), ceil(image.size[1]/temp))
+  else:
+    # this is unreachable, but it makes the linter happy
+    grid = (1,1)
+    slice_size = image.size
+
+  output: list[Image.Image] = []
+  for row in range(grid[1]):
+    for col in range(grid[0]):
+      cropped: Image.Image = image.crop((col*slice_size[0], row*slice_size[1], (col+1)*slice_size[0], (row+1)*slice_size[1]))
+      if(output_resolution != (0,0)):
+        cropped = cropped.resize(output_resolution, resample=Image.Resampling.LANCZOS)
+      output.append(cropped)
+  return (grid, tuple(output))
+
+# add tuples, return new tuple
+def add(a:tuple[int,...]|int, b:tuple[int,...]|int) -> tuple[int,...]|int:
+  if(type(a) == int and type(b) == int):
+    return a+b
+  elif(type(a) == int):
+    return tuple([x+a for x in b])
+  elif(type(b) == int):
+    return tuple([x+b for x in a])
+  else:
+    return tuple([x+y for x,y in zip(a,b)])
+
+def mult(a:tuple[int,...], b:tuple[int,...]) -> tuple[int,...]:
+  if(type(a) == int and type(b) == int):
+    return a*b
+  elif(type(a) == int):
+    return tuple([x*a for x in b])
+  elif(type(b) == int):
+    return tuple([x*b for x in a])
+  else:
+    return tuple([x*y for x,y in zip(a,b)])
 
 # automated test suite
 def __run_tests():
@@ -303,7 +431,44 @@ def __run_tests():
   for i in range(100):
     print_assert(alpha_to_dec(dec_to_alpha(i)), i, str(i)+":4")
     
-  print("all tests passed")
+    
+  print_assert(add((1,2,3),(3,2,1)), (4,4,4))
+  print_assert(add((1,2,3),1), (2,3,4))
+  print_assert(add(1,(3,2,1)), (4,3,2))
+  print_assert(add(1,1), 2)
+  
+  print_assert(mult((1,2,3),(3,2,1)), (3,4,3))
+  print_assert(mult((1,2,3),2), (2,4,6))
+  print_assert(mult(2,(3,2,1)), (6,4,2))
+  print_assert(mult(2,2), 4)
+  
+  print("All tests passed")
 __run_tests()
 
+# performance benchmarks for transform
+if(False):
+  from time import time
+  from random import randint, random
+  import numpy
+  def __timing_tests(resolution: tuple[int,int], runs: int = 10):
+    print("Running",runs,"tests at",resolution,"...")
+    overall = time()
+    total = 0
+    for i in range(runs):
+      # img = Image.new("RGB", resolution, (randint(0,255),randint(0,255),randint(0,255)))
+      img = Image.fromarray((numpy.random.rand(resolution[0],resolution[1],3)*255).astype('uint8')).convert('RGB')
+      start = time()
+      better_transform(img, (randint(-resolution[0],resolution[0]),randint(-resolution[1],resolution[1]),random()*2*pi), resolution, random()*0.9)
+      total += time()-start
+    print("| finished in "+str(int(time()-overall))+"s")
+    print("| average of  "+str(int(total/runs*1000))+"ms")
+  print("Tranform timing tests:")
+  __timing_tests((1920,1080),50)
+  __timing_tests((2560,1440),50)
+  __timing_tests((3840,2160),50)
 
+# propt user for image
+# image: Image.Image = Image.open(filedialog.askopenfilename(title ='Test Image')).copy()
+# for i in slice(image, vertical_tiles=2)[1]: i.show()
+# better_transform(image, (0,0,0), (1500,1500), 0.2).show()
+# better_transform(image, (100,-50,1), (1500,1500), 0.2).save("test.png")
