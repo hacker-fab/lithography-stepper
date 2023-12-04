@@ -3,7 +3,7 @@
 # Amscope Camera Module
 
 from camera.camera_module import *
-import amcam
+import camera.amscope.amcam as amcam
 import time
 
 class AmscopeCamera(CameraModule):
@@ -19,7 +19,7 @@ class AmscopeCamera(CameraModule):
     liveImageGood = False
     stillImageGood = False
 
-    __resolutionModes = None
+    __resolutionModes = {'stream': None, 'single': None}
 
 
     def __init__(self):
@@ -32,11 +32,11 @@ class AmscopeCamera(CameraModule):
         self.close() # reset to known state
 
 
-    def liveImageReady(self):
+    def streamImageReady(self):
         return self.liveImageGood
 
 
-    def stillImageReady(self):
+    def singleImageReady(self):
         return self.stillImageGood
 
 
@@ -53,7 +53,8 @@ class AmscopeCamera(CameraModule):
         if self.camera == None:
             return False
 
-        self.setResolution(self.getAvailableResolutions()[0])
+        self.setResolution(self.getAvailableResolutions('stream')[0], 'stream')
+        self.setResolution(self.getAvailableResolutions('single')[0], 'single')
         return True
 
 
@@ -68,14 +69,14 @@ class AmscopeCamera(CameraModule):
         self.stillImageGood = False
 
 
-    def singleCapture(self):
+    def startSingleCapture(self):
         self.stillImageGood = False
         self.camera.StartPullModeWithCallback(self.staticCallback, self)
         self.camera.Snap(self.stillIndex)
         return True
 
 
-    def streamCapture(self):
+    def startStreamCapture(self):
         self.liveImageGood = False
         self.camera.StartPullModeWithCallback(self.staticCallback, self)
         return True
@@ -93,8 +94,8 @@ class AmscopeCamera(CameraModule):
             self.liveImageGood = True
 
             if self.streamCaptureCallback != None:
-                r = self.getResolution()
-                self.streamCaptureCallback(self.liveData, r, self.ImageFormat.RGB888) # modify later
+                r = self.getResolution('stream')
+                self.streamCaptureCallback(self.liveData, r, 'RGB888')
 
         elif nEvent == amcam.AMCAM_EVENT_STILLIMAGE:
             self.stillImageGood = False
@@ -102,14 +103,14 @@ class AmscopeCamera(CameraModule):
             self.stillImageGood = True
 
             if self.singleCaptureCallback != None:
-                r = self.getResolution()
-                self.singleCaptureCallback(self.stillData, r, self.ImageFormat.RGB888) # modify later
+                r = self.getResolution('single')
+                self.singleCaptureCallback(self.stillData, r, 'RGB888')
 
         else: # for more robust operation, add more event handlers here
             pass
 
 
-    def getSingleCaptureImage(img, width, height, imageFormat):
+    def getSingleCaptureImage(self):
         if not self.stillImageReady():
             return None
         r = getResolution()
@@ -117,7 +118,7 @@ class AmscopeCamera(CameraModule):
         return img
 
 
-    def getStreamCaptureImage(imgData, width, height, imageFormat):
+    def getStreamCaptureImage(self):
         if not self.liveImageReady():
             return None
         r = getResolution()
@@ -159,30 +160,49 @@ class AmscopeCamera(CameraModule):
     
     # TODO: implement separate single and stream implementations
     def getAvailableResolutions(self, mode=None):
-        if self.__resolutionModes == None:
+        if mode != 'stream' or mode != 'single':
+            mode = 'stream'
+
+        if self.__resolutionModes['stream'] == None:
             num_resolutions = self.camera.ResolutionNumber()
-            self.__resolutionModes = [None] * num_resolutions
+            self.__resolutionModes['stream'] = [None] * num_resolutions
 
             for i in range(0, num_resolutions):
-                self.__resolutionModes[i] = self.camera.get_Resolution(i)
+                self.__resolutionModes['stream'][i] = self.camera.get_Resolution(i)
 
-        return self.__resolutionModes
+        if self.__resolutionModes['single'] == None:
+            num_resolutions = self.camera.StillResolutionNumber()
+            self.__resolutionModes['single'] = [None] * num_resolutions
+
+            for i in range(0, num_resolutions):
+                self.__resolutionModes['single'][i] = self.camera.get_StillResolution(i)
+
+        return self.__resolutionModes[mode]
     
-    # TODO: implement separate single and stream implementations
-    def getResolution(self, mode=None):
-        return self.__resolutionModes[self.liveIndex]
 
-    # TODO: implement separate single and stream implementations
+    def getResolution(self, mode=None):
+        if mode != 'stream' or mode != 'single':
+            mode = 'stream'
+        return self.__resolutionModes[mode][self.liveIndex]
+
+
     def setResolution(self, resolution, mode=None):
-        for i in range(0, len(self.__resolutionModes)):
-            if self.__resolutionModes[i] is resolution or self.__resolutionModes[i] == resolution:
-                self.stillIndex = i
-                self.liveIndex = i
-                self.camera.put_eSize(i)
-                self.stillData = bytes(resolution[0] * resolution[1])
-                self.liveData = bytes(resolution[0] * resolution[1])
-                self.stillImageGood = False
-                self.liveImageGood = False
+        if mode != 'stream' or mode != 'single':
+            mode = 'stream'
+
+        for i in range(0, len(self.__resolutionModes[mode])):
+            if self.__resolutionModes[mode][i] is resolution or self.__resolutionModes[mode][i] == resolution:
+                if mode == 'stream':
+                    self.liveImageGood = False
+                    self.liveIndex = i
+                    self.liveData = bytes(resolution[0] * resolution[1] * 3)
+                elif mode == 'single':
+                    self.stillImageGood = False
+                    self.stillIndex = i
+                    self.stillData = bytes(resolution[0] * resolution[1] * 3)
+
+                self.camera.put_Size(resolution[0], resolution[1])
+
                 return True
         return False
 

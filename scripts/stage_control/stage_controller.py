@@ -9,12 +9,14 @@ import time
 import msgpack
 import stepper_cv.align as align
 import camera.camera_module as camera_module
+import camera.amscope.amscope_camera as amscope_camera
 
 # search for config file
 try:
     import config
     useConfig = True
 except ModuleNotFoundError:
+    print("config file not found")
     useConfig = False
 
 # %% ZMQ
@@ -82,12 +84,12 @@ if __name__ == '__main__':
 
     def cameraCallback(image, dimensions, format):
         print('image captured')
-        stage.updateImage(np.reshape(image, (dimensions[0], dimensions[1], 3)))
+        stage.updateImage(np.frombuffer(bytes(image), dtype=np.uint8).reshape(dimensions[0], dimensions[1], 3))
 
     if useConfig:
         camera = config.camera
     else:
-        camera = camera_module.CameraModule()
+        camera = amscope_camera.AmscopeCamera()
 
     if not camera.open():
         print('failed to start camera')
