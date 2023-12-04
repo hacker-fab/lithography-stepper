@@ -1,13 +1,9 @@
 using LibSerialPort
 using LinearAlgebra
 using Serialization
-using Distributions
 using LinearAlgebra
 using ForwardDiff
 using Flux
-using ControlSystemsBase
-using LsqFit
-using RobustModels
 
 function send_motor_cmd(sp, vel)
     if isnothing(sp)
