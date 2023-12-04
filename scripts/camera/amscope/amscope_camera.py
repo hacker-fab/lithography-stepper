@@ -2,7 +2,7 @@
 # Hacker Fab
 # Amscope Camera Module
 
-from ../camera_module import *
+from camera.camera_module import *
 import amcam
 import time
 

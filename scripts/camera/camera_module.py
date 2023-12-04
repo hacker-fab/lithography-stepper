@@ -22,17 +22,14 @@ class CameraModule(ABC):
     __gain__ = 1
 
     # set to None if no callback desired
-    @abstractmethod
     def setSingleCaptureCallback(self, callback):
         self.__singleCaptureCallback__ = callback
 
     # set to None if no callback desired
-    @abstractmethod
     def setStreamCaptureCallback(self, callback):
         self.__streamCaptureCallback__ = callback
 
     # camera configuration functions (e.g. 'exposure_time', 'gain', 'image_mode', etc.)
-    @abstractmethod
     def getSetting(self, settingName):
         match settingName:
             case 'exposure_time':
@@ -42,31 +39,28 @@ class CameraModule(ABC):
             case other:
                 return None
 
-    @abstractmethod
     def setSetting(self, settingName, settingValue): # returns true on success
         result = False
 
         match settingName:
             case 'exposure_time':
-                if (isinstance(settingValue, int) or isinstance(settingValue, float)) and settingValue >= 0
+                if (isinstance(settingValue, int) or isinstance(settingValue, float)) and settingValue >= 0:
                     self.__exposureTime__ = settingValue
                     result = True
             case 'gain':
-                if (isinstance(settingValue, int) or isinstance(settingValue, float)) and settingValue >= 0
+                if (isinstance(settingValue, int) or isinstance(settingValue, float)) and settingValue >= 0:
                     self.__gain__ = settingValue
                     result = True
 
         return result
-    
-    @abstractmethod
+
     def getAvailableResolutions(self, mode=None):
         match mode:
             case 'B':
                 return self.__resolutionsModeB__
             case other:
                 return self.__resolutionsModeA__
-    
-    @abstractmethod
+
     def getResolution(self, mode=None):
         match mode:
             case 'B':
@@ -74,54 +68,46 @@ class CameraModule(ABC):
             case other:
                 return self.__resolutionA__
 
-    @abstractmethod
     def setResolution(self, resolution, mode=None): # returns true on success
         match mode:
             case 'B':
                 if resolution in self.__resolutionsModeB__:
-                    self.__resolutionB__ = resolution\
+                    self.__resolutionB__ = resolution
                     self.__streamImageReady__ = False
                     return True
             case other:
                 if resolution in self.__resolutionsModeA__:
                     self.__resolutionA__ = resolution
-                    self.__singleImageReady__ = False\
+                    self.__singleImageReady__ = False
                     return True
         return False
 
     # camera interfacing functions
-    @abstractmethod
     def streamImageReady(self): # returns bool
         return self.__streamImageReady__
 
-    @abstractmethod
     def singleImageReady(self): # returns bool
         return self.__singleImageReady__
 
-    @abstractmethod
     def getSingleCaptureImage(self):
-        if singleImageReady()
+        if singleImageReady():
             return (self.__singleImage__, self.__resolutionA__, 'RGB888')
-        else
+        else:
             return None
 
-    @abstractmethod
     def getStreamCaptureImage(self):
-        if streamImageReady()
+        if streamImageReady():
             return (self.__streamImage__, self.__resolutionB__, 'RGB888')
-        else
+        else:
             return None
 
-    @abstractmethod
     def isOpen(self): # returns bool
         return self.__active__
 
-    @abstractmethod
     def open(self): # returns true on success
         self.__active__ = True
         return True
         
-    @abstractmethod
     def close(self): # returns true on success
         self.__active__ = False
         self.__singleImageReady__ = False
@@ -130,7 +116,6 @@ class CameraModule(ABC):
         del self.__streamImage__
         return True
 
-    @abstractmethod
     def startSingleCapture(self): # returns true on success
         if not self.__active__:
             return False
@@ -144,7 +129,6 @@ class CameraModule(ABC):
 
         return True
 
-    @abstractmethod
     def startStreamCapture(self, iterations=10): # returns true on success
         if not self.__active__:
             return False
@@ -154,21 +138,18 @@ class CameraModule(ABC):
             self.__streamImage__ = [0x00, 0xFF, 0xFF] * (self.__resolutionB__[0] * self.__resolutionB__[1])
             self.__streamImageReady__ = True
 
-            if self.__singleCaptureCallback__ is not None:
+            if self.__streamCaptureCallback__ is not None:
                 self.__streamCaptureCallback__(self.__streamImage__, self.__resolutionB__, 'RGB888')
 
         return True
 
-    @abstractmethod
     def stopSingleCapture(self): # returns true on success
         return True
 
-    @abstractmethod
     def stopStreamCapture(self): # returns true on success
         return True
 
     # camera description function (e.g. name, vendor, model number, etc.)
-    @abstractmethod
     def getDeviceInfo(self, parameterName):
         match parameterName:
             case 'name':

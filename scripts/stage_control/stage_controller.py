@@ -1,4 +1,3 @@
-import amcam
 import zmq
 import random
 import sys
@@ -8,12 +7,12 @@ import numpy as np
 import json
 import time
 import msgpack
-import ../cv/align as align
-import ../camera/camera_module as camera_module
+import stepper_cv.align as align
+import camera.camera_module as camera_module
 
 # search for config file
 try:
-    import ../config.py as config
+    import config
     useConfig = True
 except ModuleNotFoundError:
     useConfig = False
@@ -50,7 +49,7 @@ class StageControllerLowLevel:
 
 
     def updateImage(self, currentImage, referenceImage=None):
-        socketimg.send(currentImage.tolist())
+        socketimg.send(currentImage)
         self.total += 1
 
         if referenceImage is None:
@@ -70,8 +69,8 @@ class StageControllerLowLevel:
                     dx.tolist(),
                     dy.tolist(),
                     theta.tolist(),
-                    img1.tolist(),
-                    img2.tolist()
+                    referenceImage.tolist(),
+                    currentImage.tolist()
                 ]))
             return True
 
@@ -82,7 +81,8 @@ if __name__ == '__main__':
     stage = StageControllerLowLevel()
 
     def cameraCallback(image, dimensions, format):
-        stage.updateImage(np.reshape(image, dimensions))
+        print('image captured')
+        stage.updateImage(np.reshape(image, (dimensions[0], dimensions[1], 3)))
 
     if useConfig:
         camera = config.camera
@@ -90,8 +90,11 @@ if __name__ == '__main__':
         camera = camera_module.CameraModule()
 
     if not camera.open():
-        return False
-    if not camera.setStreamCaptureCallback(cameraCallback):
-        return False
+        print('failed to start camera')
+        exit(-1)
+    camera.setStreamCaptureCallback(cameraCallback)
     if not camera.startStreamCapture():
-        return False
+        print('failed to start stream capture')
+        exit(-1)
+    print('Testing stage controller')
+    time.sleep(10)

@@ -7,24 +7,24 @@ Created on Wed Sep 27 19:26:39 2023
 """
 import time
 import numpy as np
-import cv2 as cv
+import cv2
 
 #Threshold for matching
 MIN_MATCH_COUNT = 10
 
-sift=cv.SIFT_create()
+sift=cv2.SIFT_create()
 
 def find_displacement(ref,input_frame,scale_factor=0.25,MIN_MATCH_COUNT=10,old=False,draw=False,printout=False):
     #start_time=time.time()
     img1 = ref
-    img1 = cv.resize(img1, None, fx=scale_factor, fy=scale_factor)
+    img1 = cv2.resize(img1, None, fx=scale_factor, fy=scale_factor)
     img2 = input_frame
     #Resize image2 to match the size of image1, for test only, no need to have this in real application
-    img2 = cv.resize(img2, (img1.shape[1], img1.shape[0]))
+    img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
     start_time=time.time()
     #Initiate SIFT detector, use xfeatures2d lib only for lower version of openCV
-    #sift = cv.xfeatures2d.SIFT_create()
-    #sift=cv.SIFT_create()
+    #sift = cv2.xfeatures2d.SIFT_create()
+    #sift=cv2.SIFT_create()
     #find the keypoints and descriptors with SIFT
     kp1, des1 = sift.detectAndCompute(img1,None)
     kp2, des2 = sift.detectAndCompute(img2,None)
@@ -32,7 +32,7 @@ def find_displacement(ref,input_frame,scale_factor=0.25,MIN_MATCH_COUNT=10,old=F
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
     search_params = dict(checks = 50)
-    flann = cv.FlannBasedMatcher(index_params, search_params)
+    flann = cv2.FlannBasedMatcher(index_params, search_params)
     matches = flann.knnMatch(des1,des2,k=2)
     #Store all the good matches as per Lowe's ratio test.
     good = []
@@ -47,14 +47,14 @@ def find_displacement(ref,input_frame,scale_factor=0.25,MIN_MATCH_COUNT=10,old=F
         print(src_pts[1])
         print("\n----\n")
         print(dst_pts[1])
-        M, mask = cv.findHomography(src_pts, dst_pts, cv.RANSAC,5.0)
+        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
         matchesMask = mask.ravel().tolist()
         h,w = img1.shape
         pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2) #top-left, bottom-left, bottom-right, top-right; 4 corner points at img1
-        dst = cv.perspectiveTransform(pts,M)                                  #Transform to img2 use M
+        dst = cv2.perspectiveTransform(pts,M)                                  #Transform to img2 use M
 #       if draw == True:
-#            img2 = cv.polylines(img2,[np.int32(dst)],True,255,3, cv.LINE_AA)      #Draw White rectangle dst on img2
-#       img2 = cv.polylines(img2,[np.int32(dst)],True,  0,3, cv.LINE_AA)      #Draw Black rectangle dst on img2
+#            img2 = cv2.polylines(img2,[np.int32(dst)],True,255,3, cv2.LINE_AA)      #Draw White rectangle dst on img2
+#       img2 = cv2.polylines(img2,[np.int32(dst)],True,  0,3, cv2.LINE_AA)      #Draw Black rectangle dst on img2
 
         if old:
             # Extract the translation
@@ -82,24 +82,24 @@ def find_displacement(ref,input_frame,scale_factor=0.25,MIN_MATCH_COUNT=10,old=F
                            singlePointColor = None,
                            matchesMask = matchesMask, # draw only inliers
                            flags = 2)
-        img3 = cv.drawMatches(img1,kp1,img2,kp2,good,None,**draw_params)
+        img3 = cv2.drawMatches(img1,kp1,img2,kp2,good,None,**draw_params)
         
         # Iterate through each good match to draw the coordinates
         for i, match in enumerate(good):
             if matchesMask[i]:  # Check if this match is to be drawn
                 # Coordinates in img1
                 x1, y1 = kp1[match.queryIdx].pt
-                cv.putText(img3, f"({int(x1)}, {int(y1)})", (int(x1), int(y1)), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                cv2.putText(img3, f"({int(x1)}, {int(y1)})", (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
         
                 # Coordinates in img2 - adjust x coordinate for the width of the first image
                 x2, y2 = kp2[match.trainIdx].pt
                 #x2 += img1.shape[1]  # Adjustment for the combined image
-                cv.putText(img3, f"({int(x2)}, {int(y2)})", (int(x2+img1.shape[1]), int(y2)), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                cv2.putText(img3, f"({int(x2)}, {int(y2)})", (int(x2+img1.shape[1]), int(y2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
-        cv.namedWindow('image')
-        cv.imshow('image',img3)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
+        cv2.namedWindow('image')
+        cv2.imshow('image',img3)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
     ret=(dx/scale_factor,dy/scale_factor,theta)
     return ret
 
