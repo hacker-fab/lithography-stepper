@@ -4,7 +4,6 @@ using LinearAlgebra
 using ProgressMeter
 using Serialization
 using Distributions
-using LowLevelParticleFilters
 using LinearAlgebra
 using Flux
 using ForwardDiff

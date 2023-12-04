@@ -148,23 +148,23 @@ CircleState[:x][] .= 0.0
 CircleState[:t][] .= 0.0
 CircleState[:em][] .= 0.0
 ts = -6:dt:50
-realStepIndB = [1.0 0.0 0.0;
-    0.0 1.0 0.0;
-    0.0 0.0 1.0]
-realIndPixB = [1.0 0.0 0.0;
-    0.0 1.0 0.0;
-    0.0 0.0 1.0]
-# realStepIndB = [1.0 1.0 0.0;
-#     0.0 2.0 1.0;
+# realStepIndB = [1.0 0.0 0.0;
+#     0.0 1.0 0.0;
 #     0.0 0.0 1.0]
-# realIndPixB = [1.0 0.0 0.3;
-#     0.0 1.0 0.3;
-#     0.2 0.1 1.0]
+# realIndPixB = [1.0 0.0 0.0;
+#     0.0 1.0 0.0;
+#     0.0 0.0 1.0]
+realStepIndB = [1.0 1.0 0.0;
+    0.0 2.0 1.0;
+    0.0 0.0 1.0]
+realIndPixB = [1.0 0.0 0.3;
+    0.0 1.0 0.3;
+    0.2 0.1 1.0]
 realRotStage = [1, 1, 0.0, 1.0] # circle_x, circle_y, circle_theta, circle_radius
-CircleState[:x][][:, 1] = [0.991923529037823,
-    0.9998965952620104,
-    0.00038566758340052273,
-    1.008179885883361]
+# CircleState[:x][][:, 1] = [0.991923529037823,
+#     0.9998965952620104,
+#     0.00038566758340052273,
+#     1.008179885883361]
 # CircleState[:x][][:, 1] = realRotStage
 @showprogress for (i, t) in enumerate(ts)
     ## StepInd
@@ -181,16 +181,16 @@ CircleState[:x][][:, 1] = [0.991923529037823,
 
     # update x
     x_dot = (StepIndSys[:A] * StepIndState[:x][][:, 2] + realStepIndB * StepIndState[:u][][:, 2])
-    x = StepIndState[:x][][:, 2] + dt * x_dot# + rand(MvNormal(3, 0.4))
+    x = StepIndState[:x][][:, 2] + dt * x_dot + rand(MvNormal(3, 0.4))
 
-    StepIndState[:x][][:, 1], StepIndState[:P][][:, :, 1] = predictUpdateKF!(StepIndSys,
+    StepIndState[:x][][:, 1], StepIndState[:P][][:, :, 1] = predictUpdateKF(StepIndSys,
         x, StepIndState[:x][][:, 2],
         StepIndState[:u][][:, 2],
         StepIndState[:P][][:, :, 2], dt)
 
     # update B
     B_window = 100
-    if (t > 3.0 || t < 0.0) && false
+    if (t > 3.0 || t < 0.0)
         curr_rng = 1:3
         prev_rng = 2:4
         dts = (StepIndState[:t][][curr_rng] .- StepIndState[:t][][prev_rng])
@@ -199,7 +199,10 @@ CircleState[:x][][:, 1] = [0.991923529037823,
             (StepIndState[:x][][:, curr_rng] .- StepIndState[:x][][:, prev_rng]) .-
             dts .* (StepIndSys[:A] * StepIndState[:x][][:, prev_rng])) ./ dts)
         u = eachcol(StepIndState[:u][][:, prev_rng])
-        StepIndSys[:B] = estimateB(u, y, StepIndBRLS)
+        try
+            StepIndSys[:B] = estimateB(u, y, StepIndBRLS)
+        catch
+        end
         StepIndState[:em][][:, 1] = StepIndState[:x][][:, 1] .- (StepIndState[:x][][:, 2] + StepIndSys[:A] * StepIndState[:x][][:, 2] + StepIndSys[:B] * StepIndState[:u][][:, 2])
     end
 
@@ -218,7 +221,7 @@ CircleState[:x][][:, 1] = [0.991923529037823,
     # update x
     u = IndPixState[:u][][:, 1]
     x_dot = (IndPixSys[:A] * IndPixState[:x][][:, 1] + realIndPixB * u)
-    IndPixState_x_gt = IndPixState[:x][][:, 1] + dt * x_dot #+ rand(MvNormal(3, 0.4))
+    IndPixState_x_gt = IndPixState[:x][][:, 1] + dt * x_dot + rand(MvNormal(3, 0.002))
     if t > 2.0 && t < 3.0
         IndPixState_x_gt[1:2, 1] .= 0.0
     end
@@ -246,7 +249,7 @@ CircleState[:x][][:, 1] = [0.991923529037823,
 
     # update B
     B_window = 100
-    if (t > 3.0) && false
+    if (t > 3.0)
         curr_rng = 1:3
         prev_rng = 2:4
         dts = (IndPixState[:t][][curr_rng] .- IndPixState[:t][][prev_rng])
@@ -255,8 +258,10 @@ CircleState[:x][][:, 1] = [0.991923529037823,
             (IndPixState[:x][][:, curr_rng] .- IndPixState[:x][][:, prev_rng]) .-
             dts .* (IndPixSys[:A] * IndPixState[:x][][:, prev_rng])) ./ dts)
         u = eachcol(IndPixState[:u][][:, prev_rng])
-        IndPixSys[:B] = estimateB(u, y, IndPixBRLS)
-
+        try
+            IndPixSys[:B] = estimateB(u, y, IndPixBRLS)
+        catch
+        end
         IndPixState[:em][][:, 1] = IndPixState[:x][][:, 1] .- (IndPixState[:x][][:, 2] + (IndPixSys[:A] * IndPixState[:x][][:, 2] + IndPixSys[:B] * IndPixState[:u][][:, 2]) .* dt)
     end
 
@@ -286,23 +291,23 @@ CircleState[:x][][:, 1] = [0.991923529037823,
             cx, cy, ctheta, cr = p
             return vec(chipFKbatch(x, y, theta, cx, cy, ctheta, cr))
         end
-        fit_OLS = curve_fit(model,
-            IndPixState[:x][][:, rotfilter],
-            vec(RotStageState[:x][][:, rotfilter]),
-            CircleState[:x][][:, 1],
-            lower=[-5, -5, -pi, 0.0],
-            upper=[5, 5, pi, 2.0],
-            ; autodiff=:forwarddiff)
-        wt = 1 ./ ((fit_OLS.resid .+ 1.0e-10) .^ 2)
-        fit_WLS = curve_fit(model,
-            IndPixState[:x][][:, rotfilter],
-            vec(RotStageState[:x][][:, rotfilter]),
-            wt,
-            fit_OLS.param,
-            lower=[-5, -5, -pi, 0.0],
-            upper=[5, 5, pi, 2.0],
-            ; autodiff=:forwarddiff)
-        CircleState[:x][][:, 1] = fit_WLS.param
+        # fit_OLS = curve_fit(model,
+        #     IndPixState[:x][][:, rotfilter],
+        #     vec(RotStageState[:x][][:, rotfilter]),
+        #     CircleState[:x][][:, 1],
+        #     lower=[-5, -5, -pi, 0.0],
+        #     upper=[5, 5, pi, 2.0],
+        #     ; autodiff=:forwarddiff)
+        # wt = 1 ./ ((fit_OLS.resid .+ 1.0e-10) .^ 2)
+        # fit_WLS = curve_fit(model,
+        #     IndPixState[:x][][:, rotfilter],
+        #     vec(RotStageState[:x][][:, rotfilter]),
+        #     wt,
+        #     fit_OLS.param,
+        #     lower=[-5, -5, -pi, 0.0],
+        #     upper=[5, 5, pi, 2.0],
+        #     ; autodiff=:forwarddiff)
+        # CircleState[:x][][:, 1] = fit_WLS.param
     else
         CircleState[:x][][:, 1] = CircleState[:x][][:, 2]
     end
@@ -333,11 +338,11 @@ CircleState[:x][][:, 1] = [0.991923529037823,
         # tracking error
         RotStageState[:em][][:, 1] = (target_pose - current_pose)
 
-        # Shorten the target to be close when far away to at most 10 pixels
-        pathlenmax = 0.1
-        if norm(target_pose - current_pose) > pathlenmax
-            target_pose = current_pose + pathlenmax * (target_pose - current_pose) / norm(target_pose - current_pose)
-        end
+        # # Shorten the target to be close when far away to at most 10 pixels
+        # pathlenmax = 0.1
+        # if norm(target_pose - current_pose) > pathlenmax
+        #     target_pose = current_pose + pathlenmax * (target_pose - current_pose) / norm(target_pose - current_pose)
+        # end
 
 
         # IndPix control
@@ -365,7 +370,6 @@ CircleState[:x][][:, 1] = [0.991923529037823,
             ))* (target_pose - current_pose)
             )[1:3]
             IndPixState[:r][][:, 1] = IndPixState[:u][][:, 1] = clamp.(pinv(IndPixSys[:B]) * difftottarget, -10.0, 10.0)
-
         catch
             println("jacobian error")
             break
@@ -373,7 +377,7 @@ CircleState[:x][][:, 1] = [0.991923529037823,
 
 
         # StepInd control
-        StepIndState[:r][][:, 1] = -100.0 * (IndPixState[:u][][:, 1] * dt)
+        StepIndState[:r][][:, 1] = -400.0 * (IndPixState[:u][][:, 1] * dt)
         StepIndState[:r][][:, 1] = clamp.(StepIndState[:r][][:, 1], -10.0, 10.0)
         StepIndState[:u][][:, 1] = StepIndState[:r][][:, 1]
         StepIndState[:u][][:, 1], StepIndState[:em][][:, 1] = mrac(
@@ -453,25 +457,3 @@ arrows!(ax, RotStageState[:x][][1, :], RotStageState[:x][][2, :],
     0.01 .* cos.(RotStageState[:x][][3, :]),
     0.01 .* sin.(RotStageState[:x][][3, :]), color=RotStageState[:t][], colormap=:rainbow)
 display(f)
-
-
-
-maxiter = 1000
-tol = 1.0e-6
-alpha = 0.1
-target_pose = [0.5, 0.5, 1.57]
-x = IndPixState[:x][][:, 1]
-for i in 1:maxiter
-    println(x)
-    x = x - alpha * (pinv(ForwardDiff.jacobian(chipFK, [x; realRotStage])) * (chipFK([x; realRotStage]) - target_pose))[1:3]
-    println(norm(chipFK([x; realRotStage]) - target_pose))
-    if norm(chipFK([x; realRotStage]) - target_pose) < tol
-        break
-    end
-end
-IndPixState[:r][][:, 1] = IndPixState[:u][][:, 1] = clamp.(pinv(IndPixSys[:B]) * (x - IndPixState[:x][][:, 1]), -10.0, 10.0)
-
-pinv(ForwardDiff.jacobian(chipFK, [x; realRotStage])) * (chipFK([x; realRotStage]) - target_pose)
-
-
-
