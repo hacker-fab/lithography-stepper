@@ -93,6 +93,7 @@ class AmscopeCamera(CameraModule):
             self.camera.PullImageV2(self.liveData, 24, None)
             self.liveImageGood = True
 
+
             if self.streamCaptureCallback != None:
                 r = self.getResolution('stream')
                 self.streamCaptureCallback(self.liveData, r, 'RGB888')

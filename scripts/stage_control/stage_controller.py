@@ -14,6 +14,7 @@ import camera.amscope.amscope_camera as amscope_camera
 # search for config file
 try:
     import config
+    print("config file found")
     useConfig = True
 except ModuleNotFoundError:
     print("config file not found")
@@ -66,6 +67,8 @@ class StageControllerLowLevel:
 
         displacement = align.find_displacement(referenceImage, currentImage)
         if displacement is not None:
+            dx, dy, theta = displacement
+            print(f"dx{dx}, dy={dy}, theta={theta}")
             socket.send(msgpack.packb([
                     time.time_ns(),
                     dx.tolist(),
@@ -84,7 +87,10 @@ if __name__ == '__main__':
 
     def cameraCallback(image, dimensions, format):
         print('image captured')
-        stage.updateImage(np.frombuffer(bytes(image), dtype=np.uint8).reshape(dimensions[0], dimensions[1], 3))
+        rgb = np.frombuffer(bytes(image), dtype=np.uint8).reshape(dimensions[0], dimensions[1], 3)
+        grayscale = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+        grayscale = cv2.normalize(grayscale, None, 0, 255, cv2.NORM_MINMAX)
+        stage.updateImage(grayscale)
 
     if useConfig:
         camera = config.camera
@@ -100,3 +106,4 @@ if __name__ == '__main__':
         exit(-1)
     print('Testing stage controller')
     time.sleep(10)
+    print('done')

@@ -11,7 +11,7 @@ using ZMQ
 using ZeroMQ_jll
 using MsgPack
 GLMakie.activate!(inline=false)
-include("stage_control/utils.jl")
+include("utils.jl")
 
 portname1 = "/dev/ttyACM0"
 portname2 = "/dev/ttyACM1"

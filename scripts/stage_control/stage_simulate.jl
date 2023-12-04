@@ -1,7 +1,7 @@
 using GLMakie
 using ProgressMeter
 GLMakie.activate!(inline=false)
-include("stage_control/utils.jl")
+include("utils.jl")
 
 # Model
 window_size = 5000

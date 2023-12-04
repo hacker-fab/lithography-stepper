@@ -44,9 +44,9 @@ def find_displacement(ref,input_frame,scale_factor=0.25,MIN_MATCH_COUNT=10,old=F
     if len(good)>MIN_MATCH_COUNT:
         src_pts = np.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
         dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
-        print(src_pts[1])
-        print("\n----\n")
-        print(dst_pts[1])
+        #print(src_pts[1])
+        #print("\n----\n")
+        #print(dst_pts[1])
         M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
         matchesMask = mask.ravel().tolist()
         h,w = img1.shape
