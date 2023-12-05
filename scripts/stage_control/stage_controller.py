@@ -59,7 +59,6 @@ class StageControllerLowLevel:
             referenceImage = self.referenceImage
         else:
             self.referenceImage = referenceImage
-
         # if no reference set, use current image as reference
         if referenceImage is None:
             referenceImage = currentImage
@@ -87,9 +86,7 @@ if __name__ == '__main__':
 
     def cameraCallback(image, dimensions, format):
         print('image captured')
-        rgb = np.frombuffer(bytes(image), dtype=np.uint8).reshape(dimensions[0], dimensions[1], 3)
-        grayscale = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
-        grayscale = cv2.normalize(grayscale, None, 0, 255, cv2.NORM_MINMAX)
+        grayscale = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
         stage.updateImage(grayscale)
 
     if useConfig:
@@ -100,10 +97,10 @@ if __name__ == '__main__':
     if not camera.open():
         print('failed to start camera')
         exit(-1)
+    camera.setSetting('image_format', "mono8")
     camera.setStreamCaptureCallback(cameraCallback)
     if not camera.startStreamCapture():
         print('failed to start stream capture')
         exit(-1)
     print('Testing stage controller')
-    while(True):
-        pass
+    time.sleep(5)
