@@ -105,5 +105,5 @@ if __name__ == '__main__':
         print('failed to start stream capture')
         exit(-1)
     print('Testing stage controller')
-    time.sleep(10)
-    print('done')
+    while(True):
+        pass
