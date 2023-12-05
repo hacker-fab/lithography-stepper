@@ -13,7 +13,7 @@ using MsgPack
 GLMakie.activate!(inline=false)
 include("utils.jl")
 
-portname1 = "/dev/ttyACM0"
+portname1 = "COM4"
 portname2 = "/dev/ttyACM1"
 baudrate = 115200
 
@@ -23,7 +23,7 @@ pixelerr = Socket(ctx, SUB)
 # Set Conflate == 1
 rc = ccall((:zmq_setsockopt, libzmq), Cint, (Ptr{Cvoid}, Cint, Ref{Cint}, Csize_t), pixelerr, 54, 1, sizeof(Cint))
 ZMQ.subscribe(pixelerr, "")
-connect(pixelerr, "tcp://10.193.10.1:5556")
+connect(pixelerr, "tcp://127.0.0.1:5556")
 
 ## Data
 window_size = 12000
@@ -115,7 +115,7 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
     LibSerialPort.open(portname1, baudrate) do sp1
         prev_t = time_ns()
         while running
-            data = ZMQ.recv(zmqsocket)
+            data = ZMQ.recv(pixelerr)
             statedata = Float64.(MsgPack.unpack(data)[1:4])
             
             lock(state[:lock]) do
@@ -204,6 +204,7 @@ while true
     notify(VisionErrState[:em])
     #    println(VisionErrState[:t][][1])
     # end
+    sleep(0.1)
     yield()
 end
 running = false
