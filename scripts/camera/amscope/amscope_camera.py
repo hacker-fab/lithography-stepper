@@ -114,16 +114,18 @@ class AmscopeCamera(CameraModule):
     def getSingleCaptureImage(self):
         if not self.stillImageReady():
             return None
-        r = getResolution()
-        self.__copyImage(self.stillData, img, r.width, r.height, width, height, imageFormat)
+        r = self.getResolution('single')
+        img = bytes(r[0] * r[1])
+        self.__copyImage(self.stillData, img, r[0], r[1],r[0], r[1], 'RGB888')
         return img
 
 
     def getStreamCaptureImage(self):
         if not self.liveImageReady():
             return None
-        r = getResolution()
-        __copyImage(self.liveData, img, r.width, r.height, width, height, imageFormat)
+        r = self.getResolution('stream')
+        img = bytes(r[0] * r[1])
+        self.__copyImage(self.liveData, img, r[0], r[1], r[0], r[1], 'RGB888')
         return img
 
 
