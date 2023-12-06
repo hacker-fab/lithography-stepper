@@ -5,6 +5,12 @@ from time import sleep
 from litho_img_lib import *
 from litho_gui_lib import *
 
+from config import camera as camera_hw
+from stage_control.stage_controller import StageControllerLowLevel
+import cv2
+import threading
+import time
+
 # TODO
 # - Camera Integration
 #     make camera (and thumbnails ideally) auto resize images / have images fill the widget
@@ -879,9 +885,9 @@ def begin_patterning():
       image = prep_pattern(slicer.image())
     #TODO apply fine adjustment vector to image
     #TODO remove once camera is implemented
-    camera_image_preview = rasterize(image.resize(fit_image(image, (GUI.window_size[0],(GUI.window_size[0]*9)//16)), Image.Resampling.LANCZOS))
-    camera.config(image=camera_image_preview)
-    camera.image = camera_image_preview
+    #camera_image_preview = rasterize(image.resize(fit_image(image, (GUI.window_size[0],(GUI.window_size[0]*9)//16)), Image.Resampling.LANCZOS))
+    #camera.config(image=camera_image_preview)
+    #camera.image = camera_image_preview
     #pattern
     if(pattern_status == 'aborting'):
       break
@@ -893,8 +899,9 @@ def begin_patterning():
       break
     if(result):
       # TODO remove once camera is implemented
-      camera.config(image=camera_placeholder)
-      camera.image = camera_placeholder
+      pass
+      #camera.config(image=camera_placeholder)
+      #camera.image = camera_placeholder
     # repeat
     if(slicer.next()):
       pattern_progress['value'] += 1
@@ -910,8 +917,8 @@ def begin_patterning():
   # update next tile preview
   update_next_tile_preview()
   # TODO remove once camera is implemented
-  camera.config(image=camera_placeholder)
-  camera.image = camera_placeholder
+  #camera.config(image=camera_placeholder)
+  #camera.image = camera_placeholder
   # give user feedback
   pattern_progress['value'] = 0
   if(pattern_status == 'aborting'):
@@ -960,9 +967,65 @@ GUI.add_widget("clear_button", clear_button)
 
 #endregion
 
+#region: stage connections
+stage_ll = StageControllerLowLevel()
+#endregion
+
+#region: Camera Setup
+cv_stage_job = None
+gui_camera_preview_job = None
+cv_stage_job_time = 0
+gui_camera_preview_job_time = 0
+
+# sends image to stage controller
+def cv_stage(camera_image):
+  grayscale = cv2.normalize(camera_image, None, 0, 255, cv2.NORM_MINMAX)
+  stage_ll.updateImage(grayscale)
+
+
+# updates camera preview on GUI
+def gui_camera_preview(camera_image, dimensions):
+  pil_img = Image.fromarray(camera_image, mode='L')
+  gui_img = rasterize(pil_img.resize(fit_image(pil_img, (GUI.window_size[0],(GUI.window_size[0]*dimensions[0])/dimensions[1]//1)), Image.Resampling.LANCZOS))
+  camera.config(image=gui_img)
+  camera.image = gui_img
+
+
+# called by camera hardware as separate thread
+def cameraCallback(image, dimensions, format):
+  global cv_stage_job
+  global gui_camera_preview_job
+  global cv_stage_job_time
+  global gui_camera_preview_job_time
+
+  # might be susceptible to TOC-TOU race condition
+  if cv_stage_job is None or not cv_stage_job.is_alive():
+    cv_stage_job = threading.Thread(target=cv_stage, args=(image,))
+    cv_stage_job.start()
+    new_time = time.time()
+    print(f"CV-Stage Time: {new_time - cv_stage_job_time}s", flush=True)
+    cv_stage_job_time = new_time
+
+  if gui_camera_preview_job is None or not gui_camera_preview_job.is_alive():
+    gui_camera_preview_job = threading.Thread(target=gui_camera_preview, args=(image, dimensions,))
+    gui_camera_preview_job.start()
+    new_time = time.time()
+    print(f"GUI-Camera Time: {new_time - gui_camera_preview_job_time}s", flush=True)
+    gui_camera_preview_job_time = new_time
+
+  #print(f'image captured; num_threads={len(threading.enumerate())}', flush=True)
+
+
+if not camera_hw.open():
+  debug.error("Camera failed to start.")
+else:
+  camera_hw.setSetting('image_format', "mono8")
+  camera_hw.setStreamCaptureCallback(cameraCallback)
+
+  if not camera_hw.startStreamCapture():
+    debug.error('Failed to start stream capture for camera')
+#endregion: Camera Setup
+
 GUI.debug.info("Debug info will appear here")
 GUI.mainloop()
-
-
-
 
