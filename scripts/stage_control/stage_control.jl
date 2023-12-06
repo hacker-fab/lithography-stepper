@@ -13,7 +13,7 @@ using MsgPack
 GLMakie.activate!(inline=false)
 include("utils.jl")
 
-portname1 = "COM4"
+portname1 = "COM6"
 portname2 = "/dev/ttyACM1"
 baudrate = 115200
 
@@ -26,7 +26,7 @@ ZMQ.subscribe(pixelerr, "")
 connect(pixelerr, "tcp://127.0.0.1:5556")
 
 ## Data
-window_size = 12000
+window_size = 1000
 
 # Vision System
 VisionErrSys = Dict(
@@ -117,6 +117,7 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
         while running
             data = ZMQ.recv(pixelerr)
             statedata = Float64.(MsgPack.unpack(data)[1:4])
+            println(statedata)
             
             lock(state[:lock]) do
                 lock(sys[:lock]) do
@@ -190,23 +191,25 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
 
                 end
             end
-            send_motor_cmd(sp1, state[:u][][:, 1])
+            sleep(0.1)
+            yield()
+            # send_motor_cmd(sp1, state[:u][][:, 1])
         end
     end
 end
-Threads.@spawn updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
-
-while true
-    # lock(VisionErrState[:lock]) do
-    notify(VisionErrState[:x])
-    notify(VisionErrState[:t])
-    notify(VisionErrState[:u])
-    notify(VisionErrState[:em])
-    #    println(VisionErrState[:t][][1])
-    # end
-    sleep(0.1)
-    yield()
-end
+# Threads.@spawn updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
+updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
+# while true
+#     # lock(VisionErrState[:lock]) do
+#     notify(VisionErrState[:x])
+#     notify(VisionErrState[:t])
+#     notify(VisionErrState[:u])
+#     notify(VisionErrState[:em])
+#        println(VisionErrState[:t][][1])
+#     # end
+#     sleep(1)
+#     yield()
+# end
 running = false
 
 VisionErrSys[:B]

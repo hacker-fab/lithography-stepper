@@ -7,9 +7,11 @@ from litho_gui_lib import *
 
 from config import camera as camera_hw
 from stage_control.stage_controller import StageControllerLowLevel
+from stage_control.stage_controller import socket as stage_socket
 import cv2
 import threading
 import time
+import msgpack
 
 # TODO
 # - Camera Integration
@@ -967,9 +969,16 @@ GUI.add_widget("clear_button", clear_button)
 
 #endregion
 
-#region: stage connections
+#region: Stage Control Setup
 stage_ll = StageControllerLowLevel()
-#endregion
+
+def update_func_x():
+  print('moving x', flush=True)
+  dx = stage.step_size[0]
+  stage_socket.send(msgpack.packb([time.time_ns(), [dx]]))
+
+stage.update_funcs['x'] = {'x': update_func_x}
+#endregion: Stage Control Setup
 
 #region: Camera Setup
 cv_stage_job = None
@@ -1013,7 +1022,7 @@ def cameraCallback(image, dimensions, format):
     print(f"GUI-Camera Time: {new_time - gui_camera_preview_job_time}s", flush=True)
     gui_camera_preview_job_time = new_time
 
-  #print(f'image captured; num_threads={len(threading.enumerate())}', flush=True)
+  print(f'image captured; num_threads={len(threading.enumerate())}', flush=True)
 
 
 if not camera_hw.open():
