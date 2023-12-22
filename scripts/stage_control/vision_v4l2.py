@@ -49,12 +49,13 @@ def set_ref(cropidx):
 def align_next():
 	global imgdata, camera
 	retval, im = get_img()
+	img = cv2.rotate(cv2.UMat(im), cv2.ROTATE_90_CLOCKWISE)
 	
-	liveimg = cv2.cvtColor(cv2.UMat(im), cv2.COLOR_RGB2GRAY)
+	liveimg = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 	imgdata["liveimg"] = liveimg
 	if imgdata["refimg"] is None:
 		imgdata["refimg"] = liveimg
-		imgdata["refcrop"] = [0, im.shape[0], 0, im.shape[1], 0, 0]
+		imgdata["refcrop"] = [0, im.shape[1], 0, im.shape[0], 0, 0]
 
 	h, w = (imgdata["refcrop"][1] - imgdata["refcrop"][0]), (imgdata["refcrop"][3] - imgdata["refcrop"][2])
 	res = cv2.matchTemplate(imgdata["refimg"], liveimg, cv2.TM_CCOEFF_NORMED)

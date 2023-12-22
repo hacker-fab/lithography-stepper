@@ -1,5 +1,4 @@
 using LibSerialPort
-using GLMakie
 using LinearAlgebra
 using ProgressMeter
 using Serialization
@@ -10,20 +9,11 @@ using ForwardDiff
 using ZMQ
 using ZeroMQ_jll
 using MsgPack
-GLMakie.activate!(inline=false)
 include("utils.jl")
 
 portname1 = "COM6"
 portname2 = "/dev/ttyACM1"
 baudrate = 115200
-
-# ZMQ
-ctx = Context()
-pixelerr = Socket(ctx, SUB)
-# Set Conflate == 1
-rc = ccall((:zmq_setsockopt, libzmq), Cint, (Ptr{Cvoid}, Cint, Ref{Cint}, Csize_t), pixelerr, 54, 1, sizeof(Cint))
-ZMQ.subscribe(pixelerr, "")
-connect(pixelerr, "tcp://127.0.0.1:5556")
 
 ## Data
 window_size = 1000
@@ -86,39 +76,16 @@ VisionErrState = Dict(
     :lock => ReentrantLock()
 )
 
-## Visualize
-f = Figure()
-
-ax = Axis(f[1, 1])
-lines!(ax, @lift($(VisionErrState[:x])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:x])[2, :]), color=:black)
-# lines!(ax, @lift($(VisionErrState[:x])[3, :]), color=:blue)
-
-ax = Axis(f[2, 1])
-lines!(ax, @lift($(VisionErrState[:u])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:u])[2, :]), color=:black)
-lines!(ax, @lift($(VisionErrState[:u])[3, :]), color=:blue)
-
-ax = Axis(f[3, 1])
-lines!(ax, @lift($(VisionErrState[:em])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:em])[2, :]), color=:black)
-lines!(ax, @lift($(VisionErrState[:em])[3, :]), color=:blue)
-
-display(f)
-# Global Status
-running = true
-
 # Vision Thread
-function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
+function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
     global running
 
-    LibSerialPort.open(portname1, baudrate) do sp1
+    # LibSerialPort.open(portname1, baudrate) do sp1
         prev_t = time_ns()
         while running
-            data = ZMQ.recv(pixelerr)
-            statedata = Float64.(MsgPack.unpack(data)[1:4])
-            println(statedata)
-            
+            statedata = take!(errCh)
+            # println(statedata)
+
             lock(state[:lock]) do
                 lock(sys[:lock]) do
                     if (time_ns() - t0) * 1.0e-9 < 40.0
@@ -191,34 +158,28 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
 
                 end
             end
-            sleep(0.1)
             yield()
             # send_motor_cmd(sp1, state[:u][][:, 1])
         end
-    end
+    # end
 end
-# Threads.@spawn updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
-updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
-# while true
-#     # lock(VisionErrState[:lock]) do
-#     notify(VisionErrState[:x])
-#     notify(VisionErrState[:t])
-#     notify(VisionErrState[:u])
-#     notify(VisionErrState[:em])
-#        println(VisionErrState[:t][][1])
-#     # end
-#     sleep(1)
-#     yield()
+Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
+# updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
+
+
+
+
+
+
+# running = false
+
+# VisionErrSys[:B]
+# VisionErrState[:u][][:, :]
+
+
+# LibSerialPort.open(portname1, baudrate) do sp1
+#     send_motor_cmd(sp1, [0.0, 
+#     -0.16, -0.0])
 # end
-running = false
 
-VisionErrSys[:B]
-VisionErrState[:u][][:, :]
-
-
-LibSerialPort.open(portname1, baudrate) do sp1
-    send_motor_cmd(sp1, [0.0, 
-    -0.16, -0.0])
-end
-
-1.0 * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1]
+# 1.0 * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1]

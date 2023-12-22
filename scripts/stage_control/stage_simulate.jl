@@ -1,5 +1,6 @@
 using GLMakie
 using ProgressMeter
+using Distributions
 GLMakie.activate!(inline=false)
 include("utils.jl")
 
