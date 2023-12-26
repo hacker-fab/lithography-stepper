@@ -113,8 +113,8 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                     # Default
                     state[:t][][1] = statedata[1] / 1e9
                     state[:x][][:, 1] = statedata[2:4]
-                    state[:xi][:, 1] = state[:xi][][:, 2]
-                    state[:xd][:, 1] = state[:xd][][:, 2]
+                    state[:xi][][:, 1] = state[:xi][][:, 2]
+                    state[:xd][][:, 1] = state[:xd][][:, 2]
                     state[:r][][:, 1] = r
                     state[:u][][:, 1] = r
                     state[:em][][:, 1] = state[:em][][:, 2]

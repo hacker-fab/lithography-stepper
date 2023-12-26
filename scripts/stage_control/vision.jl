@@ -4,6 +4,19 @@
 using PyCall
 using Observables
 
+const PYLOCK = Ref{ReentrantLock}()
+PYLOCK[] = ReentrantLock()
+
+# acquire the lock before any code calls Python
+pylock(f::Function) = Base.lock(PYLOCK[]) do
+    prev_gc = GC.enable(false)
+    try 
+        return f()
+    finally
+        GC.enable(prev_gc) # recover previous state
+    end
+end
+
 # @pyinclude("vision_flir.py")
 # liveimgsz = Int[2736, 1824]
 @pyinclude("vision_v4l2.py")
@@ -53,24 +66,13 @@ function vislooponce(visionCh, refCh)
         shiftx, shifty = max(1 + margin, 1 + xoff):min(liveimgsz[1] - margin, liveimgsz[1] + xoff),
         max(1 + margin, 1 + yoff):min(liveimgsz[2] - margin, liveimgsz[2] + yoff)
 
-        shiftimgcrop = liveimg[][cropx, cropy]
-        originxy = [shiftx[1], shifty[1]]
+        if length(cropx) > 0 && length(cropy) > 0
+            shiftimgcrop = liveimg[][cropx, cropy]
+            originxy = [shiftx[1], shifty[1]]
+        end
     end
     dxy = py"""align($(liveimg[]), $(shiftimgcrop), $(annoimg[]))"""
 
     # x y flipped due to row/column major between julia and python
     put!(visionCh, [Int64(time_ns()), Int64.([originxy[1] - dxy[1], originxy[2] - dxy[2]])..., Int64(0)])
 end
-
-# Threads.@spawn visloop(visionCh, refCh)
-# running = false
-# # GC.enable(false)
-# shiftxy = [0, 0]
-# shiftimgcrop = liveimg[][1:10, 1:20]
-# py"""align($(liveimg[]), $shiftimgcrop, $shiftxy, $(annoimg[]))"""
-
-# # annoimg[][1:10, 1:10]
-
-# # visloop(visionCh, refCh)
-
-# dxy = py"""align($(liveimg[]), $shiftimgcrop, $shiftxy, $(annoimg[]))"""

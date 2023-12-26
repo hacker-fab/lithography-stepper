@@ -4,8 +4,8 @@ GLMakie.activate!(inline=false)
 # Global Status
 running = true
 # Vision Data
-visionCh = Channel{Array{Int64}}(1)
-refCh = Channel{Array{Int64}}(1)
+visionCh = Channel{Array{Int64}}(100)
+refCh = Channel{Array{Int64}}(100)
 
 include("stage_control.jl")
 include("vision.jl")
@@ -66,25 +66,21 @@ end
 
 display(f)
 
+
 while true
+    # start_t = time()
     vislooponce(visionCh, refCh)
 
-    lock(VisionErrState[:lock]) do
-        notify(VisionErrState[:x])
-        notify(VisionErrState[:t])
-        notify(VisionErrState[:u])
-        notify(VisionErrState[:em])
+    @async begin
+        lock(VisionErrState[:lock]) do
+            notify(VisionErrState[:x])
+            notify(VisionErrState[:t])
+            notify(VisionErrState[:u])
+            notify(VisionErrState[:em])
+        end  
+        notify(annoimg)
+        notify(mouseimg)
     end
-    notify(annoimg)
-    notify(mouseimg)
-    # sleep(0.03) # 30fps
+    # println(1 / (time() - start_t))
     yield()
 end
-
-# annoimg[]
-# running = false
-
-# annoimg[]
-
-
-# py"""cv2.matchTemplate($(liveimg[]), $(liveimg[]), cv2.TM_CCOEFF_NORMED)"""
