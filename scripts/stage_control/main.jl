@@ -1,4 +1,3 @@
-
 using GLMakie
 GLMakie.activate!(inline=false)
 
@@ -6,6 +5,7 @@ GLMakie.activate!(inline=false)
 running = true
 # Vision Data
 visionCh = Channel{Array{Int64}}(1)
+refCh = Channel{Array{Int64}}(1)
 
 include("stage_control.jl")
 include("vision.jl")
@@ -25,25 +25,21 @@ lines!(ax, @lift($(VisionErrState[:u])[3, :]), color=:blue)
 
 ax = Axis(f[2:5, 1], aspect=DataAspect())
 deregister_interaction!(ax, :rectanglezoom)
-image!(ax, liveimg)
+image!(ax, @lift($(annoimg)[1:4:end, 1:4:end]))
 
 ax2 = Axis(f[2:5, 2], aspect=DataAspect())
 deregister_interaction!(ax2, :rectanglezoom)
-image!(ax2, liverefimg)
+image!(ax2, mouseimg)
 display(f)
 
+# Mouse Interactions
 mouseinit = true
-updateref = false
 start_position = Float64[0, 0]
-cropidx = Int[1, refimgsz[1], 1, refimgsz[2], 0, 0]
 register_interaction!(ax2, :my_interaction) do event::Makie.MouseEvent, axis
     global mouseinit
     global start_position
-    global refimgsz
-    global refimg
-    global liverefimg
-    global cropidx
-    global updateref
+    global liveimgsz
+    global refCh
 
     if event.type === Makie.MouseEventTypes.leftclick && !mouseinit
         # deregister_interaction!(ax1, :my_interaction)
@@ -61,14 +57,7 @@ register_interaction!(ax2, :my_interaction) do event::Makie.MouseEvent, axis
             return
         end
         xoff, yoff = round(Int, event.data[1] - start_position[1]), round(Int, event.data[2] - start_position[2])
-        cropx, cropy   = max(1, 1-xoff):min(refimgsz[1], refimgsz[1] - xoff), max(1, 1-yoff):min(refimgsz[2], refimgsz[2] - yoff)
-        shiftx, shifty = max(1, 1 + xoff):min(refimgsz[1], refimgsz[1] + xoff), max(1, 1 + yoff):min(refimgsz[2], refimgsz[2] + yoff)
-        cropidx = [cropx[1], cropx[end], cropy[1], cropy[end], shiftx[1], shifty[1]]
-        shiftimgcrop = refimg[][cropx, cropy]
-        liverefimg[] .= 0.0
-        liverefimg[][shiftx, shifty] .= shiftimgcrop
-        notify(liverefimg)
-        updateref = true
+        push!(refCh, [xoff, yoff])
     end
     return
 end
@@ -77,21 +66,8 @@ end
 
 display(f)
 
-
 while true
-    t_start = time()
-    disp, liveimg_ = pycall(py"""align_next""", Tuple{Tuple{Int,Int},PyArray})
-    liveimg[] .= liveimg_[1:4:end, 1:4:end]
-    if updateref
-        refimg[] .= pycall(py"""set_ref""", PyArray, cropidx)
-        updateref = false
-    end
-    if updateref
-        put!(visionCh, [Int64(time_ns()), Int64.(disp .* 0)..., Int64(0)])
-    else
-        put!(visionCh, [Int64(time_ns()), Int64.(disp)..., Int64(0)])
-    end
-    # println(1 / ((time() - t_start)), " ", disp[1], " ", disp[2])
+    vislooponce(visionCh, refCh)
 
     lock(VisionErrState[:lock]) do
         notify(VisionErrState[:x])
@@ -99,7 +75,16 @@ while true
         notify(VisionErrState[:u])
         notify(VisionErrState[:em])
     end
-    notify(liveimg)
+    notify(annoimg)
+    notify(mouseimg)
+    # sleep(0.03) # 30fps
     yield()
 end
-updateref
+
+# annoimg[]
+# running = false
+
+# annoimg[]
+
+
+# py"""cv2.matchTemplate($(liveimg[]), $(liveimg[]), cv2.TM_CCOEFF_NORMED)"""

@@ -11,8 +11,7 @@ using ZeroMQ_jll
 using MsgPack
 include("utils.jl")
 
-portname1 = "COM6"
-portname2 = "/dev/ttyACM1"
+portname1 = "/dev/ttyACM0"
 baudrate = 115200
 
 ## Data
@@ -68,6 +67,8 @@ VisionErrMRAC = Dict(
 # Vision State
 VisionErrState = Dict(
     :x => Observable(zeros(3, window_size)), # x, y, theta
+    :xi => Observable(zeros(3, window_size)), # x, y, theta
+    :xd => Observable(zeros(3, window_size)), # x, y, theta
     :u => Observable(zeros(3, window_size)),
     :r => Observable(zeros(3, window_size)),
     :t => Observable(zeros(window_size)),
@@ -90,16 +91,18 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                 lock(sys[:lock]) do
                     if (time_ns() - t0) * 1.0e-9 < 40.0
                         # calibration trajectory
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.01)
+                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.1)
                     elseif  (time_ns() - t0) * 1.0e-9 < 100.0
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.01)
+                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.1)
                     else
                         # minimize reference using simple pid
-                        r = -0.05 * pinv(sys[:B]) * state[:x][][:, 1]
+                        r = (-0.3) * pinv(sys[:B]) * state[:x][][:, 1] + (-0.1) * pinv(sys[:B]) * state[:xi][][:, 1]
                     end
 
                     state[:t][] = circshift(state[:t][], (1,))
                     state[:x][] = circshift(state[:x][], (0, 1))
+                    state[:xi][] = circshift(state[:xi][], (0, 1))
+                    state[:xd][] = circshift(state[:xd][], (0, 1))
                     state[:r][][:, end] .= 0.0
                     state[:r][] = circshift(state[:r][], (0, 1))
                     state[:u][][:, end] .= 0.0
@@ -110,6 +113,8 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                     # Default
                     state[:t][][1] = statedata[1] / 1e9
                     state[:x][][:, 1] = statedata[2:4]
+                    state[:xi][:, 1] = state[:xi][][:, 2]
+                    state[:xd][:, 1] = state[:xd][][:, 2]
                     state[:r][][:, 1] = r
                     state[:u][][:, 1] = r
                     state[:em][][:, 1] = state[:em][][:, 2]
@@ -123,9 +128,12 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                         state[:u][][:, 2],
                         state[:P][][:, :, 2],
                         state[:t][][1] - state[:t][][2])
+                    state[:xi][][:, 1] = state[:x][][:, 1] * (state[:t][][1] - state[:t][][2]) + state[:xi][][:, 2]
+                    state[:xd][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2]) / (state[:t][][1] - state[:t][][2])
                     state[:em][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2]) .-
                                          (state[:t][][1] - state[:t][][2]) .*
                                          (sys[:A] * state[:x][][:, 2] .+ sys[:B] * state[:u][][:, 2])
+                                         
 
                     # Update B
                     if state[:t][][1] - t0 < 40.0
@@ -167,11 +175,7 @@ Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionE
 # updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
 
 
-
-
-
-
-# running = false
+# running = true
 
 # VisionErrSys[:B]
 # VisionErrState[:u][][:, :]
