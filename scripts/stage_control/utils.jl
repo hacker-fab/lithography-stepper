@@ -62,6 +62,28 @@ function bootstrap_stepper_u0(t, scale)
     end
 end
 
+function sysid_stepper_u0(t, scale)
+    return sign.(randn(3)) * scale
+end
+
+function chirp(t, startfreq, endfreq, scale)
+    if t >= 0.0 && t < 40
+        p = (t - 0) / 40
+        return scale .* [0.0, sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))), 0.0]
+    elseif t >= 40 && t < 80
+        p = (t - 40) / (80 - 40)
+        return scale .* [sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))), 0.0, 0.0]
+    elseif t >= 80 && t < 150
+        p = (t - 80) / (150 - 80)
+        return scale .* [sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))),
+            sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))),
+            0.0]
+    else
+        return scale .* [0.0, 0.0, 0.0]
+    end
+    return
+end
+
 function bootstrap_stepper_u(t)
     if t >= 0.0 && t < 1.0
         return [sin((t - 0) * (5 * 2 * pi)), 0.0, 0.0]
@@ -116,8 +138,8 @@ function chipFKbatch(x, y, theta, cx, cy, ctheta, cr)::Matrix
     # cr of rotation stage in pixel frame
     return reduce(hcat,
         [x .+ cx .+ cr .* cos.(theta),
-        y .+ cy .+ cr .* sin.(theta),
-        theta .+ ctheta])'
+            y .+ cy .+ cr .* sin.(theta),
+            theta .+ ctheta])'
 end
 
 function estimateB(us, ys)

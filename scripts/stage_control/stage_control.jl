@@ -15,20 +15,32 @@ portname1 = "/dev/ttyACM0"
 baudrate = 115200
 
 ## Data
-window_size = 1000
+window_size = 5000
 
 # Vision System
 VisionErrSys = Dict(
+    # :A => [0.0 0 0
+    #     0 0.0 0
+    #     0 0 0.0],
+    # :B => [1 0 0 # estimated
+    #     0 1 0
+    #     0 0 1],
+    # :C => [1.0 0 0
+    #     0 1.0 0
+    #     0 0 1.0],
+    # :D => [0.0 0 0
+    #     0 0 0
+    #     0 0 0],
     :A => [0.0 0 0
         0 0.0 0
         0 0 0.0],
-    :B => [1 0 0 # estimated
-        0 1 0
-        0 0 1],
-    :C => [1.0 0 0
-        0 1.0 0
-        0 0 1.0],
-    :D => [0.0 0 0
+    :B => [-0.163373466017901 0.1178583391750256 0
+        0.3570341825245376 -0.5288049386921838 0
+        0.0 0.0 0.0],
+    :C => [-2.75815000690517 -1.248646502371119 0
+        2.670909977274403 -1.7843373849509552 0
+        0.0 0.0 0.0],
+    :D => [0 0 0
         0 0 0
         0 0 0],
     :A_m => [0.0 0 0
@@ -52,10 +64,10 @@ VisionErrBRLS = Dict(
 
 VisionErrMRAC = Dict(
     :P => lyap((VisionErrSys[:A_m] + Diagonal([1.0, 1.0, 1.0]))', -Diagonal([1.0, 1.0, 1.0])),
-    :Γ_x => 50.0,
-    :Γ_r => 50.0,
-    :Γ_w => 10.0,
-    :Γ_v => 10.0,
+    :Γ_x => 100.0,
+    :Γ_r => 100.0,
+    :Γ_w => 50.0,
+    :Γ_v => 50.0,
     :Γ_σ => 0.0,
     :Λ => Diagonal([1.0, 1.0, 1.0]),
     :K_x => zeros(3, 3),
@@ -79,7 +91,7 @@ VisionErrState = Dict(
 
 # Vision Thread
 function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
-    global running
+    global running, mouseinit
 
     # LibSerialPort.open(portname1, baudrate) do sp1
         prev_t = time_ns()
@@ -89,15 +101,19 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
 
             lock(state[:lock]) do
                 lock(sys[:lock]) do
-                    if (time_ns() - t0) * 1.0e-9 < 40.0
-                        # calibration trajectory
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.1)
-                    elseif  (time_ns() - t0) * 1.0e-9 < 100.0
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.1)
-                    else
+                    # if (time_ns() - t0) * 1.0e-9 < 150.0
+                    #     # calibration trajectory
+                    #     # r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
+                    #     r = chirp((time_ns() - t0) * 1.0e-9, 1.0, 15, 0.05)
+                    #     # if (time_ns() - t0) * 1.0e-9 < 100.0
+                    #     #     r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
+                    # else
+                    #     running = false
                         # minimize reference using simple pid
-                        r = (-0.3) * pinv(sys[:B]) * state[:x][][:, 1] + (-0.1) * pinv(sys[:B]) * state[:xi][][:, 1]
-                    end
+                        # r = (-0.0002) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
+                        # 0.0 * (-0.00005) * pinv(sys[:B]) * ((state[:xi][][:, 1]))
+                        r = (-0.00005) * pinv(sys[:B]) * ((state[:x][][:, 1]))
+                    # end
 
                     state[:t][] = circshift(state[:t][], (1,))
                     state[:x][] = circshift(state[:x][], (0, 1))
@@ -121,34 +137,37 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                     state[:P][][:, :, 1] = state[:P][][:, :, 2]
 
                     # Update
-                    state[:x][][:, 1], state[:P][][:, :, 1] = predictUpdateKF(
-                        sys,
-                        state[:x][][:, 1],
-                        state[:x][][:, 2],
-                        state[:u][][:, 2],
-                        state[:P][][:, :, 2],
-                        state[:t][][1] - state[:t][][2])
-                    state[:xi][][:, 1] = state[:x][][:, 1] * (state[:t][][1] - state[:t][][2]) + state[:xi][][:, 2]
-                    state[:xd][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2]) / (state[:t][][1] - state[:t][][2])
+                    if (time_ns() - t0) * 1.0e-9 > 0
+                        # KF only after calibration
+                        state[:x][][:, 1], state[:P][][:, :, 1] = predictUpdateKF(
+                            sys,
+                            state[:x][][:, 1],
+                            state[:x][][:, 2],
+                            state[:u][][:, 2],
+                            state[:P][][:, :, 2],
+                            state[:t][][1] - state[:t][][2])
+                    end
+                    state[:xi][][:, 1] = state[:x][][:, 1] + state[:xi][][:, 2]
+                    state[:xd][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2])
                     state[:em][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2]) .-
                                          (state[:t][][1] - state[:t][][2]) .*
                                          (sys[:A] * state[:x][][:, 2] .+ sys[:B] * state[:u][][:, 2])
-                                         
 
-                    # Update B
-                    if state[:t][][1] - t0 < 40.0
-                        curr_rng = 1:3
-                        prev_rng = 2:4
-                        dts = (state[:t][][curr_rng] .- state[:t][][prev_rng])
-                        dts = [dts'; dts'; dts']
-                        y = eachcol((
-                            (state[:x][][:, curr_rng] .- state[:x][][:, prev_rng]) .-
-                            dts .* (sys[:A] * state[:x][][:, prev_rng])) ./ dts)
-                        u = eachcol(state[:u][][:, prev_rng])
-                        sys[:B] = estimateB(u, y, BRLS)
-                    end
 
-                    if state[:t][][1] - t0 > 40.0
+                    # # Update B
+                    # if state[:t][][1] - t0 < 0 # disabled
+                    #     curr_rng = 1:3
+                    #     prev_rng = 2:4
+                    #     dts = (state[:t][][curr_rng] .- state[:t][][prev_rng])
+                    #     dts = [dts'; dts'; dts']
+                    #     y = eachcol((
+                    #         (state[:x][][:, curr_rng] .- state[:x][][:, prev_rng]) .-
+                    #         dts .* (sys[:A] * state[:x][][:, prev_rng])) ./ dts)
+                    #     u = eachcol(state[:u][][:, prev_rng])
+                    #     sys[:B] = estimateB(u, y, BRLS)
+                    # end
+
+                    if state[:t][][1] - t0 > 1
                         state[:u][][:, 1], state[:em][][:, 1] = mrac(
                             sys,
                             mracparam,
@@ -167,23 +186,29 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                 end
             end
             yield()
-            # send_motor_cmd(sp1, state[:u][][:, 1])
+            if mouseinit[]
+                # send_motor_cmd(sp1, state[:u][][:, 1])
+            end
         end
     # end
 end
-Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
+Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
 # updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
 
-
+# VisionErrState[:u][][:, 1]
+# (-0.3) * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1] #+ (-0.01) * pinv(VisionErrSys[:B]) * VisionErrState[:xi][][:, 1]
+# VisionErrSys[:B]
 # running = true
-
+# (-0.0001) * pinv(VisionErrSys[:B]) * (pinv(VisionErrSys[:C]) * (VisionErrState[:x][][:, 1] - VisionErrSys[:D] * VisionErrState[:u][][:, 2]))
+# VisionErrState[:u][][:, 4]
 # VisionErrSys[:B]
 # VisionErrState[:u][][:, :]
 
 
 # LibSerialPort.open(portname1, baudrate) do sp1
-#     send_motor_cmd(sp1, [0.0, 
-#     -0.16, -0.0])
+#     for i in 1:100
+#         send_motor_cmd(sp1, [-0.01, 0.0, 0.0])
+#     end
 # end
 
 # 1.0 * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1]

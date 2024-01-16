@@ -458,3 +458,20 @@ arrows!(ax, RotStageState[:x][][1, :], RotStageState[:x][][2, :],
     0.01 .* cos.(RotStageState[:x][][3, :]),
     0.01 .* sin.(RotStageState[:x][][3, :]), color=RotStageState[:t][], colormap=:rainbow)
 display(f)
+
+
+using ControlSystemIdentification
+using ControlSystemsBase
+
+valid_rng = 1:2000
+idinput = reverse(IndPixState[:u][][1:2, valid_rng], dims=2)
+idoutput = detrend(reverse(IndPixState[:x][][1:2, valid_rng], dims=2))
+ts = reverse(IndPixState[:t][][valid_rng], dims=1)
+
+myiddata = iddata(
+    idoutput,
+    idinput,
+    sum(ts[2:end] - ts[1:end-1]) / length(ts),
+)
+ssid = subspaceid(myiddata, 2)
+

@@ -8,19 +8,20 @@ const PYLOCK = Ref{ReentrantLock}()
 PYLOCK[] = ReentrantLock()
 
 # acquire the lock before any code calls Python
-pylock(f::Function) = Base.lock(PYLOCK[]) do
-    prev_gc = GC.enable(false)
-    try 
-        return f()
-    finally
-        GC.enable(prev_gc) # recover previous state
+pylock(f::Function) =
+    Base.lock(PYLOCK[]) do
+        prev_gc = GC.enable(false)
+        try
+            return f()
+        finally
+            GC.enable(prev_gc) # recover previous state
+        end
     end
-end
 
 # @pyinclude("vision_flir.py")
 # liveimgsz = Int[2736, 1824]
 @pyinclude("vision_v4l2.py")
-liveimgsz = Int[2560, 1920]
+liveimgsz = Int[3392, 2544]
 @pyinclude("align.py")
 
 py"""
@@ -55,6 +56,7 @@ function vislooponce(visionCh, refCh)
         max(1 + margin, 1 - yoff):min(liveimgsz[2] - margin, liveimgsz[2] - yoff)
         shiftx, shifty = max(1 + margin, 1 + xoff):min(liveimgsz[1] - margin, liveimgsz[1] + xoff),
         max(1 + margin, 1 + yoff):min(liveimgsz[2] - margin, liveimgsz[2] + yoff)
+        originxy = [shiftx[1], shifty[1]]
 
         mouseimg[] .= 0.0
         mouseimg[][shiftx, shifty] .= liveimg[][cropx, cropy]
@@ -68,11 +70,13 @@ function vislooponce(visionCh, refCh)
 
         if length(cropx) > 0 && length(cropy) > 0
             shiftimgcrop = liveimg[][cropx, cropy]
-            originxy = [shiftx[1], shifty[1]]
+            # originxy = [shiftx[1], shifty[1]]
+            originxy .+= margin
         end
     end
     dxy = py"""align($(liveimg[]), $(shiftimgcrop), $(annoimg[]))"""
 
     # x y flipped due to row/column major between julia and python
+    # put!(visionCh, [Int64(time_ns()), Int64.([originxy[1], originxy[2]])..., Int64(0)])
     put!(visionCh, [Int64(time_ns()), Int64.([originxy[1] - dxy[1], originxy[2] - dxy[2]])..., Int64(0)])
 end

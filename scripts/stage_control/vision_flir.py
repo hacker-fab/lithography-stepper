@@ -49,3 +49,10 @@ def get_img(buffer):
             image_result.Release()
             done = True
     return 1
+
+# import cv2
+# img = np.zeros((width, height), dtype=np.uint8)
+# while True:
+#     get_img(img)
+#     cv2.imshow('img', img[::4, ::4])
+#     cv2.waitKey(1)
