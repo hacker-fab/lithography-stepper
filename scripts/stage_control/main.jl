@@ -87,46 +87,46 @@ while running
     yield()
 end
 
-# running = false
-# using Serialization
-# open("VisionErrState_chirp.jls", "w") do f
-#     serialize(f, Dict(
-#         "x" => VisionErrState[:x][],
-#         "xi" => VisionErrState[:xi][],
-#         "xd" => VisionErrState[:xd][],
-#         "u" => VisionErrState[:u][],
-#         "r" => VisionErrState[:r][],
-#         "t" => VisionErrState[:t][],
-#         "em" => VisionErrState[:em][],
-#         "P" => VisionErrState[:P][],
-#     ))
-# end
+running = false
+using Serialization
+open("VisionErrState_chirp.jls", "w") do f
+    serialize(f, Dict(
+        "x" => VisionErrState[:x][],
+        "xi" => VisionErrState[:xi][],
+        "xd" => VisionErrState[:xd][],
+        "u" => VisionErrState[:u][],
+        "r" => VisionErrState[:r][],
+        "t" => VisionErrState[:t][],
+        "em" => VisionErrState[:em][],
+        "P" => VisionErrState[:P][],
+    ))
+end
 
-# using ControlSystemIdentification
-# using ControlSystemsBase
-# using Serialization
-# open("VisionErrState_chirp.jls") do f
-#     global VisionErrState_id
-#     VisionErrState_id = deserialize(f)
-# end
+using ControlSystemIdentification
+using ControlSystemsBase
+using Serialization
+open("VisionErrState_chirp.jls") do f
+    global VisionErrState_id
+    VisionErrState_id = deserialize(f)
+end
 
-# f = Figure()
-# ax = Axis(f[1, 1])
-# lines!(ax, VisionErrState_id["x"][1, :], color=:red)
-# lines!(ax, VisionErrState_id["x"][2, :], color=:black)
-# display(f)
+f = Figure()
+ax = Axis(f[1, 1])
+lines!(ax, VisionErrState_id["x"][1, :], color=:red)
+lines!(ax, VisionErrState_id["x"][2, :], color=:black)
+display(f)
 
 
 
-# valid_rng = 1:920
-# idinput = reverse(VisionErrState_id["u"][1:2, valid_rng], dims=2)
-# idoutput = detrend(reverse(VisionErrState_id["x"][1:2, valid_rng], dims=2))
-# ts = reverse(VisionErrState_id["t"][valid_rng], dims=1)
+valid_rng = 35:957
+idinput = reverse(VisionErrState_id["u"][1:2, valid_rng], dims=2)
+idoutput = detrend(reverse(VisionErrState_id["x"][1:2, valid_rng], dims=2))
+ts = reverse(VisionErrState_id["t"][valid_rng], dims=1)
 
-# myiddata = iddata(
-#     idoutput,
-#     idinput,
-#     sum(ts[2:end] - ts[1:end-1]) / length(ts),
-# )
+myiddata = iddata(
+    idoutput,
+    idinput,
+    sum(ts[2:end] - ts[1:end-1]) / length(ts),
+)
 
-# ssid = subspaceid(myiddata, 2, zeroD = true, verbose = true)
+ssid = subspaceid(myiddata, 2, zeroD = true, verbose = true)

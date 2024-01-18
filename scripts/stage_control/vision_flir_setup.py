@@ -25,7 +25,11 @@ print(cam.Width.GetAccessMode(), "==" ,PySpin.RW)
 cam.Width.SetValue(cam.Width.GetMax())
 cam.Height.SetValue(cam.Height.GetMax())
 cam.AcquisitionFrameRateEnable.SetValue(True)
-cam.AcquisitionFrameRate.SetValue(cam.AcquisitionFrameRate.GetMax())
+cam.AcquisitionFrameRate.SetValue(14.985)
+cam.ExposureAuto.SetValue(PySpin.ExposureAuto_Off)
+cam.ExposureMode.SetValue(PySpin.ExposureMode_Timed)
+cam.ExposureTime.SetValue(4167)
+# cam.AcquisitionFrameRate.SetValue(cam.AcquisitionFrameRate.GetMax())
 
 # %%
 nodemap = cam.GetNodeMap()

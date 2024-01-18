@@ -61,9 +61,10 @@ function vislooponce(visionCh, refCh)
         mouseimg[][shiftx, shifty] .= liveimg[][cropx, cropy]
 
         # Template Matching with margin
-        margin = 500
-        cropx, cropy = max(1 + margin, 1 - xoff):min(liveimgsz[1] - margin, liveimgsz[1] - xoff),
-        max(1 + margin, 1 - yoff):min(liveimgsz[2] - margin, liveimgsz[2] - yoff)
+        marginx = 1200
+        marginy = 700
+        cropx, cropy = max(1 + marginx, 1 - xoff):min(liveimgsz[1] - marginx, liveimgsz[1] - xoff),
+        max(1 + marginy, 1 - yoff):min(liveimgsz[2] - marginy, liveimgsz[2] - yoff)
         shiftimgcrop = liveimg[][cropx, cropy]
         originxy = [xoff + cropx[1], yoff + cropy[1]]
     end
