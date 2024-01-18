@@ -34,11 +34,11 @@ VisionErrSys = Dict(
     :A => [0.0 0 0
         0 0.0 0
         0 0 0.0],
-    :B => [-0.163373466017901 0.1178583391750256 0
-        0.3570341825245376 -0.5288049386921838 0
+    :B => [1.5559772070762954 1.5786510395642772 0
+        -3.1767618254116674 3.301756101842966 0
         0.0 0.0 0.0],
-    :C => [-2.75815000690517 -1.248646502371119 0
-        2.670909977274403 -1.7843373849509552 0
+    :C => [-20.73553758759016 8.851081684359555 0
+        -8.300118977158657 -8.921583867836002 0
         0.0 0.0 0.0],
     :D => [0 0 0
         0 0 0
@@ -93,7 +93,7 @@ VisionErrState = Dict(
 function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
     global running, mouseinit
 
-    # LibSerialPort.open(portname1, baudrate) do sp1
+    LibSerialPort.open(portname1, baudrate) do sp1
         prev_t = time_ns()
         while running
             statedata = take!(errCh)
@@ -104,15 +104,15 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                     # if (time_ns() - t0) * 1.0e-9 < 150.0
                     #     # calibration trajectory
                     #     # r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
-                    #     r = chirp((time_ns() - t0) * 1.0e-9, 1.0, 15, 0.05)
+                    #     r = chirp((time_ns() - t0) * 1.0e-9, 1.0, 15, 0.06)
                     #     # if (time_ns() - t0) * 1.0e-9 < 100.0
                     #     #     r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
                     # else
                     #     running = false
-                        # minimize reference using simple pid
-                        # r = (-0.0002) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
-                        # 0.0 * (-0.00005) * pinv(sys[:B]) * ((state[:xi][][:, 1]))
-                        r = (-0.00005) * pinv(sys[:B]) * ((state[:x][][:, 1]))
+                    # minimize reference using simple pid
+                    r = (0.025) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
+                        (0.00005) * pinv(sys[:B]) * ((state[:xi][][:, 1]))
+                    # r = (0.02) * pinv(sys[:B]) * ((state[:x][][:, 1]))
                     # end
 
                     state[:t][] = circshift(state[:t][], (1,))
@@ -165,7 +165,7 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
                     #         dts .* (sys[:A] * state[:x][][:, prev_rng])) ./ dts)
                     #     u = eachcol(state[:u][][:, prev_rng])
                     #     sys[:B] = estimateB(u, y, BRLS)
-                    # end
+                    # # end
 
                     if state[:t][][1] - t0 > 1
                         state[:u][][:, 1], state[:em][][:, 1] = mrac(
@@ -187,10 +187,10 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
             end
             yield()
             if mouseinit[]
-                # send_motor_cmd(sp1, state[:u][][:, 1])
+                send_motor_cmd(sp1, state[:u][][:, 1])
             end
         end
-    # end
+    end
 end
 Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
 # updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())

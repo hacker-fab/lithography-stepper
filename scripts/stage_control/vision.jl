@@ -18,10 +18,10 @@ pylock(f::Function) =
         end
     end
 
-# @pyinclude("vision_flir.py")
-# liveimgsz = Int[2736, 1824]
-@pyinclude("vision_v4l2.py")
-liveimgsz = Int[3392, 2544]
+@pyinclude("vision_flir.py")
+liveimgsz = Int[2736, 1824]
+# @pyinclude("vision_v4l2.py")
+# liveimgsz = Int[1920, 1080]
 @pyinclude("align.py")
 
 py"""
@@ -54,9 +54,8 @@ function vislooponce(visionCh, refCh)
         margin = 0
         cropx, cropy = max(1 + margin, 1 - xoff):min(liveimgsz[1] - margin, liveimgsz[1] - xoff),
         max(1 + margin, 1 - yoff):min(liveimgsz[2] - margin, liveimgsz[2] - yoff)
-        shiftx, shifty = max(1 + margin, 1 + xoff):min(liveimgsz[1] - margin, liveimgsz[1] + xoff),
-        max(1 + margin, 1 + yoff):min(liveimgsz[2] - margin, liveimgsz[2] + yoff)
-        originxy = [shiftx[1], shifty[1]]
+        shiftx, shifty = max(1, 1 + xoff):min(liveimgsz[1], liveimgsz[1] + xoff),
+        max(1, 1 + yoff):min(liveimgsz[2], liveimgsz[2] + yoff)
 
         mouseimg[] .= 0.0
         mouseimg[][shiftx, shifty] .= liveimg[][cropx, cropy]
@@ -65,18 +64,11 @@ function vislooponce(visionCh, refCh)
         margin = 500
         cropx, cropy = max(1 + margin, 1 - xoff):min(liveimgsz[1] - margin, liveimgsz[1] - xoff),
         max(1 + margin, 1 - yoff):min(liveimgsz[2] - margin, liveimgsz[2] - yoff)
-        shiftx, shifty = max(1 + margin, 1 + xoff):min(liveimgsz[1] - margin, liveimgsz[1] + xoff),
-        max(1 + margin, 1 + yoff):min(liveimgsz[2] - margin, liveimgsz[2] + yoff)
-
-        if length(cropx) > 0 && length(cropy) > 0
-            shiftimgcrop = liveimg[][cropx, cropy]
-            # originxy = [shiftx[1], shifty[1]]
-            originxy .+= margin
-        end
+        shiftimgcrop = liveimg[][cropx, cropy]
+        originxy = [xoff + cropx[1], yoff + cropy[1]]
     end
     dxy = py"""align($(liveimg[]), $(shiftimgcrop), $(annoimg[]))"""
+    dxy .+= 1 # convert to julia indexing
 
-    # x y flipped due to row/column major between julia and python
-    # put!(visionCh, [Int64(time_ns()), Int64.([originxy[1], originxy[2]])..., Int64(0)])
     put!(visionCh, [Int64(time_ns()), Int64.([originxy[1] - dxy[1], originxy[2] - dxy[2]])..., Int64(0)])
 end

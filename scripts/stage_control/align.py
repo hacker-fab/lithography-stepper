@@ -31,5 +31,5 @@ def align(livimg, refimg, annoimg):
 	dx, dy = (top_left[0], top_left[1])
 
 	annoimg[:, :] = livimg
-	# cv2.rectangle(annoimg[:, :],top_left, bottom_right, 255, 5)
+	cv2.rectangle(annoimg[:, :],top_left, bottom_right, 255, 5)
 	return [dy, dx]
