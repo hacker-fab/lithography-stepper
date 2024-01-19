@@ -19,26 +19,26 @@ window_size = 5000
 
 # Vision System
 VisionErrSys = Dict(
-    # :A => [0.0 0 0
-    #     0 0.0 0
-    #     0 0 0.0],
-    # :B => [1 0 0 # estimated
-    #     0 1 0
-    #     0 0 1],
-    # :C => [1.0 0 0
-    #     0 1.0 0
-    #     0 0 1.0],
-    # :D => [0.0 0 0
-    #     0 0 0
-    #     0 0 0],
     :A => [0.0 0 0
         0 0.0 0
         0 0 0.0],
-    :B => [1.5559772070762954 1.5786510395642772 0
-        -3.1767618254116674 3.301756101842966 0
+    :B => [1 0 0 # estimated
+        0 1 0
+        0 0 1],
+    :C => [1.0 0 0
+        0 1.0 0
+        0 0 1.0],
+    :D => [0.0 0 0
+        0 0 0
+        0 0 0],
+    :A => [0.0 0 0
+        0 0.0 0
+        0 0 0.0],
+    :B => [1.4464407018344951  -1.6508435498432217 0
+    0.5870122079007305   4.5153087583181835 0
         0.0 0.0 0.0],
-    :C => [-20.73553758759016 8.851081684359555 0
-        -8.300118977158657 -8.921583867836002 0
+    :C => [-14.56077763865841    -4.9681782988376675 0
+    8.071668829950482  -18.84906267728016 0
         0.0 0.0 0.0],
     :D => [0 0 0
         0 0 0
@@ -54,6 +54,10 @@ VisionErrSys = Dict(
     :Q => 100.0 * Diagonal([1.0 for i in 1:3]),
     :lock => ReentrantLock()
 )
+
+# using ControlSystemsBase
+# lqr(ControlSystemsBase.Discrete, VisionErrSys[:A] + I, VisionErrSys[:B], I, I)
+
 
 VisionErrBRLS = Dict(
     :x0 => zeros(9),
@@ -101,18 +105,21 @@ function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
 
             lock(state[:lock]) do
                 lock(sys[:lock]) do
-                    # if (time_ns() - t0) * 1.0e-9 < 150.0
+                    # if (time_ns() - t0) * 1.0e-9 > 0.0 && (time_ns() - t0) * 1.0e-9 < 170.0
                     #     # calibration trajectory
                     #     # r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
-                    #     r = chirp((time_ns() - t0) * 1.0e-9, 1.0, 15, 0.06)
+                    #     r = chirp((time_ns() - t0 - 0) * 1.0e-9, 1.0, 15, 0.03)
                     #     # if (time_ns() - t0) * 1.0e-9 < 100.0
                     #     #     r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
                     # else
                     #     running = false
                     # minimize reference using simple pid
-                    r = (0.025) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
-                        (0.00005) * pinv(sys[:B]) * ((state[:xi][][:, 1]))
-                    # r = (0.02) * pinv(sys[:B]) * ((state[:x][][:, 1]))
+                    r = (0.008) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
+                        (0.00007) * pinv(sys[:B]) * ((state[:xi][][:, 1])) + 
+                        (0.003) * pinv(sys[:B]) * ((state[:xd][][:, 1]))
+
+                    # r = (0.01) * pinv(sys[:B]) * ((state[:x][][:, 1]))
+                    # r = (0.025) * ((state[:x][][:, 1]))
                     # end
 
                     state[:t][] = circshift(state[:t][], (1,))

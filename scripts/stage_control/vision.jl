@@ -19,7 +19,8 @@ pylock(f::Function) =
     end
 
 @pyinclude("vision_flir.py")
-liveimgsz = Int[2736, 1824]
+liveimgsz = Int[1368, 912]
+# liveimgsz = Int[2736, 1824]
 # @pyinclude("vision_v4l2.py")
 # liveimgsz = Int[1920, 1080]
 @pyinclude("align.py")
@@ -39,7 +40,7 @@ function vislooponce(visionCh, refCh)
     global running, liveimg, visinit, shiftimgcrop, originxy
     py"""get_img($(liveimg[]))"""
     if visinit
-        margin = 150
+        margin = 75
         cropx, cropy = size(liveimg[], 1)÷2-margin:size(liveimg[], 1)÷2+margin,
         size(liveimg[], 2)÷2-margin:size(liveimg[], 2)÷2+margin
         shiftx, shifty = cropx, cropy
@@ -61,10 +62,15 @@ function vislooponce(visionCh, refCh)
         mouseimg[][shiftx, shifty] .= liveimg[][cropx, cropy]
 
         # Template Matching with margin
-        marginx = 1200
-        marginy = 700
+        # marginx = 1200
+        # marginy = 700
+        marginx = 600
+        marginy = 400
         cropx, cropy = max(1 + marginx, 1 - xoff):min(liveimgsz[1] - marginx, liveimgsz[1] - xoff),
         max(1 + marginy, 1 - yoff):min(liveimgsz[2] - marginy, liveimgsz[2] - yoff)
+        if length(cropx) <= 10 || length(cropy) <= 10
+            return
+        end
         shiftimgcrop = liveimg[][cropx, cropy]
         originxy = [xoff + cropx[1], yoff + cropy[1]]
     end

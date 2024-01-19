@@ -67,14 +67,14 @@ function sysid_stepper_u0(t, scale)
 end
 
 function chirp(t, startfreq, endfreq, scale)
-    if t >= 0.0 && t < 40
-        p = (t - 0) / 40
+    if t >= 20.0 && t < 60
+        p = (t - 20) / 60
         return scale .* [0.0, sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))), 0.0]
-    elseif t >= 40 && t < 80
-        p = (t - 40) / (80 - 40)
+    elseif t >= 60 && t < 100
+        p = (t - 60) / (100 - 60)
         return scale .* [sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))), 0.0, 0.0]
-    elseif t >= 80 && t < 150
-        p = (t - 80) / (150 - 80)
+    elseif t >= 100 && t < 170
+        p = (t - 100) / (170 - 100)
         return scale .* [sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))),
             sign(sin(((startfreq + (endfreq - startfreq) * p) .^ 2))),
             0.0]
