@@ -977,7 +977,18 @@ def update_func_x():
   dx = stage.step_size[0]
   stage_socket.send(msgpack.packb([time.time_ns(), [dx]]))
 
-stage.update_funcs['x'] = {'x': update_func_x}
+previous_xyz: tuple[int,int,int] = stage.xyz()
+def move_stage():
+  global previous_xyz
+  current = stage.xyz()
+  dx = current[0]-previous_xyz[0]
+  dy = current[2]-previous_xyz[2]
+  # right now, Y and Z axes are swapped
+  stage_socket.send(msgpack.packb([time.time_ns(), dx, dy, 0]))
+  previous_xyz = stage.xyz()
+  print(f"test {dx} {dy}", flush=True)
+
+stage.update_funcs['any'] = {'any': move_stage}
 #endregion: Stage Control Setup
 
 #region: Camera Setup
@@ -995,7 +1006,7 @@ def cv_stage(camera_image):
 # updates camera preview on GUI
 def gui_camera_preview(camera_image, dimensions):
   pil_img = Image.fromarray(camera_image, mode='L')
-  gui_img = rasterize(pil_img.resize(fit_image(pil_img, (GUI.window_size[0],(GUI.window_size[0]*dimensions[0])/dimensions[1]//1)), Image.Resampling.LANCZOS))
+  gui_img = rasterize(pil_img.resize(fit_image(pil_img, (GUI.window_size[0],int((GUI.window_size[0]*dimensions[0])/dimensions[1]//1))), Image.Resampling.LANCZOS))
   camera.config(image=gui_img)
   camera.image = gui_img
 
@@ -1006,7 +1017,7 @@ def cameraCallback(image, dimensions, format):
   global gui_camera_preview_job
   global cv_stage_job_time
   global gui_camera_preview_job_time
-
+  '''
   # might be susceptible to TOC-TOU race condition
   if cv_stage_job is None or not cv_stage_job.is_alive():
     cv_stage_job = threading.Thread(target=cv_stage, args=(image,))
@@ -1014,15 +1025,15 @@ def cameraCallback(image, dimensions, format):
     new_time = time.time()
     print(f"CV-Stage Time: {new_time - cv_stage_job_time}s", flush=True)
     cv_stage_job_time = new_time
-
+  '''
   if gui_camera_preview_job is None or not gui_camera_preview_job.is_alive():
     gui_camera_preview_job = threading.Thread(target=gui_camera_preview, args=(image, dimensions,))
     gui_camera_preview_job.start()
     new_time = time.time()
-    print(f"GUI-Camera Time: {new_time - gui_camera_preview_job_time}s", flush=True)
+    #print(f"GUI-Camera Time: {new_time - gui_camera_preview_job_time}s", flush=True)
     gui_camera_preview_job_time = new_time
 
-  print(f'image captured; num_threads={len(threading.enumerate())}', flush=True)
+  #print(f'image captured; num_threads={len(threading.enumerate())}', flush=True)
 
 
 if not camera_hw.open():

@@ -13,7 +13,7 @@ using MsgPack
 GLMakie.activate!(inline=false)
 include("utils.jl")
 
-portname1 = "COM6"
+portname1 = "COM5"
 portname2 = "/dev/ttyACM1"
 baudrate = 115200
 
