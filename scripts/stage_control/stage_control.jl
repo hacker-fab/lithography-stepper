@@ -1,5 +1,4 @@
 using LibSerialPort
-using GLMakie
 using LinearAlgebra
 using ProgressMeter
 using Serialization
@@ -10,23 +9,14 @@ using ForwardDiff
 using ZMQ
 using ZeroMQ_jll
 using MsgPack
-GLMakie.activate!(inline=false)
 include("utils.jl")
 
-portname1 = "COM5"
-portname2 = "/dev/ttyACM1"
+portname1 = "COM6"
+portname2 = "/dev/ttyACM0"
 baudrate = 115200
 
-# ZMQ
-ctx = Context()
-pixelerr = Socket(ctx, SUB)
-# Set Conflate == 1
-rc = ccall((:zmq_setsockopt, libzmq), Cint, (Ptr{Cvoid}, Cint, Ref{Cint}, Csize_t), pixelerr, 54, 1, sizeof(Cint))
-ZMQ.subscribe(pixelerr, "")
-connect(pixelerr, "tcp://127.0.0.1:5556")
-
 ## Data
-window_size = 1000
+window_size = 5000
 
 # Vision System
 VisionErrSys = Dict(
@@ -42,6 +32,18 @@ VisionErrSys = Dict(
     :D => [0.0 0 0
         0 0 0
         0 0 0],
+    :A => [0.0 0 0
+        0 0.0 0
+        0 0 0.0],
+    :B => [1.4464407018344951  -1.6508435498432217 0
+    0.5870122079007305   4.5153087583181835 0
+        0.0 0.0 0.0],
+    :C => [-14.56077763865841    -4.9681782988376675 0
+    8.071668829950482  -18.84906267728016 0
+        0.0 0.0 0.0],
+    :D => [0 0 0
+        0 0 0
+        0 0 0],
     :A_m => [0.0 0 0
         0 0.0 0
         0 0 0.0],
@@ -54,6 +56,10 @@ VisionErrSys = Dict(
     :lock => ReentrantLock()
 )
 
+# using ControlSystemsBase
+# lqr(ControlSystemsBase.Discrete, VisionErrSys[:A] + I, VisionErrSys[:B], I, I)
+
+
 VisionErrBRLS = Dict(
     :x0 => zeros(9),
     :P0 => 100.0 * Diagonal([1.0 for i in 1:9]),
@@ -63,10 +69,10 @@ VisionErrBRLS = Dict(
 
 VisionErrMRAC = Dict(
     :P => lyap((VisionErrSys[:A_m] + Diagonal([1.0, 1.0, 1.0]))', -Diagonal([1.0, 1.0, 1.0])),
-    :Γ_x => 50.0,
-    :Γ_r => 50.0,
-    :Γ_w => 10.0,
-    :Γ_v => 10.0,
+    :Γ_x => 100.0,
+    :Γ_r => 100.0,
+    :Γ_w => 50.0,
+    :Γ_v => 50.0,
     :Γ_σ => 0.0,
     :Λ => Diagonal([1.0, 1.0, 1.0]),
     :K_x => zeros(3, 3),
@@ -78,6 +84,8 @@ VisionErrMRAC = Dict(
 # Vision State
 VisionErrState = Dict(
     :x => Observable(zeros(3, window_size)), # x, y, theta
+    :xi => Observable(zeros(3, window_size)), # x, y, theta
+    :xd => Observable(zeros(3, window_size)), # x, y, theta
     :u => Observable(zeros(3, window_size)),
     :r => Observable(zeros(3, window_size)),
     :t => Observable(zeros(window_size)),
@@ -86,53 +94,39 @@ VisionErrState = Dict(
     :lock => ReentrantLock()
 )
 
-## Visualize
-f = Figure()
-
-ax = Axis(f[1, 1])
-lines!(ax, @lift($(VisionErrState[:x])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:x])[2, :]), color=:black)
-# lines!(ax, @lift($(VisionErrState[:x])[3, :]), color=:blue)
-
-ax = Axis(f[2, 1])
-lines!(ax, @lift($(VisionErrState[:u])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:u])[2, :]), color=:black)
-lines!(ax, @lift($(VisionErrState[:u])[3, :]), color=:blue)
-
-ax = Axis(f[3, 1])
-lines!(ax, @lift($(VisionErrState[:em])[1, :]), color=:red)
-lines!(ax, @lift($(VisionErrState[:em])[2, :]), color=:black)
-lines!(ax, @lift($(VisionErrState[:em])[3, :]), color=:blue)
-
-display(f)
-# Global Status
-running = true
-
 # Vision Thread
-function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
-    global running
+function updateVisionError(errCh, sys, state, BRLS, mracparam, t0)
+    global running, mouseinit
 
     LibSerialPort.open(portname1, baudrate) do sp1
         prev_t = time_ns()
         while running
-            data = ZMQ.recv(pixelerr)
-            statedata = Float64.(MsgPack.unpack(data)[1:4])
-            println(statedata)
-            
+            statedata = take!(errCh)
+            # println(statedata)
+
             lock(state[:lock]) do
                 lock(sys[:lock]) do
-                    if (time_ns() - t0) * 1.0e-9 < 40.0
-                        # calibration trajectory
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.01)
-                    elseif  (time_ns() - t0) * 1.0e-9 < 100.0
-                        r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.01)
-                    else
-                        # minimize reference using simple pid
-                        r = -0.05 * pinv(sys[:B]) * state[:x][][:, 1]
-                    end
+                    # if (time_ns() - t0) * 1.0e-9 > 0.0 && (time_ns() - t0) * 1.0e-9 < 170.0
+                    #     # calibration trajectory
+                    #     # r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
+                    #     r = chirp((time_ns() - t0 - 0) * 1.0e-9, 1.0, 15, 0.03)
+                    #     # if (time_ns() - t0) * 1.0e-9 < 100.0
+                    #     #     r = bootstrap_stepper_u0((time_ns() - t0) * 1.0e-9, 0.06)
+                    # else
+                    #     running = false
+                    # minimize reference using simple pid
+                    r = (0.008) * pinv(sys[:B]) * ((state[:x][][:, 1])) +
+                        (0.00007) * pinv(sys[:B]) * ((state[:xi][][:, 1])) + 
+                        (0.003) * pinv(sys[:B]) * ((state[:xd][][:, 1]))
+
+                    # r = (0.01) * pinv(sys[:B]) * ((state[:x][][:, 1]))
+                    # r = (0.025) * ((state[:x][][:, 1]))
+                    # end
 
                     state[:t][] = circshift(state[:t][], (1,))
                     state[:x][] = circshift(state[:x][], (0, 1))
+                    state[:xi][] = circshift(state[:xi][], (0, 1))
+                    state[:xd][] = circshift(state[:xd][], (0, 1))
                     state[:r][][:, end] .= 0.0
                     state[:r][] = circshift(state[:r][], (0, 1))
                     state[:u][][:, end] .= 0.0
@@ -143,37 +137,45 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
                     # Default
                     state[:t][][1] = statedata[1] / 1e9
                     state[:x][][:, 1] = statedata[2:4]
+                    state[:xi][][:, 1] = state[:xi][][:, 2]
+                    state[:xd][][:, 1] = state[:xd][][:, 2]
                     state[:r][][:, 1] = r
                     state[:u][][:, 1] = r
                     state[:em][][:, 1] = state[:em][][:, 2]
                     state[:P][][:, :, 1] = state[:P][][:, :, 2]
 
                     # Update
-                    state[:x][][:, 1], state[:P][][:, :, 1] = predictUpdateKF(
-                        sys,
-                        state[:x][][:, 1],
-                        state[:x][][:, 2],
-                        state[:u][][:, 2],
-                        state[:P][][:, :, 2],
-                        state[:t][][1] - state[:t][][2])
+                    if (time_ns() - t0) * 1.0e-9 > 0
+                        # KF only after calibration
+                        state[:x][][:, 1], state[:P][][:, :, 1] = predictUpdateKF(
+                            sys,
+                            state[:x][][:, 1],
+                            state[:x][][:, 2],
+                            state[:u][][:, 2],
+                            state[:P][][:, :, 2],
+                            state[:t][][1] - state[:t][][2])
+                    end
+                    state[:xi][][:, 1] = state[:x][][:, 1] + state[:xi][][:, 2]
+                    state[:xd][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2])
                     state[:em][][:, 1] = (state[:x][][:, 1] - state[:x][][:, 2]) .-
                                          (state[:t][][1] - state[:t][][2]) .*
                                          (sys[:A] * state[:x][][:, 2] .+ sys[:B] * state[:u][][:, 2])
 
-                    # Update B
-                    if state[:t][][1] - t0 < 40.0
-                        curr_rng = 1:3
-                        prev_rng = 2:4
-                        dts = (state[:t][][curr_rng] .- state[:t][][prev_rng])
-                        dts = [dts'; dts'; dts']
-                        y = eachcol((
-                            (state[:x][][:, curr_rng] .- state[:x][][:, prev_rng]) .-
-                            dts .* (sys[:A] * state[:x][][:, prev_rng])) ./ dts)
-                        u = eachcol(state[:u][][:, prev_rng])
-                        sys[:B] = estimateB(u, y, BRLS)
-                    end
 
-                    if state[:t][][1] - t0 > 40.0
+                    # # Update B
+                    # if state[:t][][1] - t0 < 0 # disabled
+                    #     curr_rng = 1:3
+                    #     prev_rng = 2:4
+                    #     dts = (state[:t][][curr_rng] .- state[:t][][prev_rng])
+                    #     dts = [dts'; dts'; dts']
+                    #     y = eachcol((
+                    #         (state[:x][][:, curr_rng] .- state[:x][][:, prev_rng]) .-
+                    #         dts .* (sys[:A] * state[:x][][:, prev_rng])) ./ dts)
+                    #     u = eachcol(state[:u][][:, prev_rng])
+                    #     sys[:B] = estimateB(u, y, BRLS)
+                    # # end
+
+                    if state[:t][][1] - t0 > 1
                         state[:u][][:, 1], state[:em][][:, 1] = mrac(
                             sys,
                             mracparam,
@@ -191,34 +193,30 @@ function updateVisionError(zmqsocket, sys, state, BRLS, mracparam, t0)
 
                 end
             end
-            sleep(0.1)
             yield()
-            # send_motor_cmd(sp1, state[:u][][:, 1])
+            if mouseinit[]
+                send_motor_cmd(sp1, state[:u][][:, 1])
+            end
         end
     end
 end
-# Threads.@spawn updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns()) 
-updateVisionError(pixelerr, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
-# while true
-#     # lock(VisionErrState[:lock]) do
-#     notify(VisionErrState[:x])
-#     notify(VisionErrState[:t])
-#     notify(VisionErrState[:u])
-#     notify(VisionErrState[:em])
-#        println(VisionErrState[:t][][1])
-#     # end
-#     sleep(1)
-#     yield()
+Threads.@spawn updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
+# updateVisionError(visionCh, VisionErrSys, VisionErrState, VisionErrBRLS, VisionErrMRAC, time_ns())
+
+# VisionErrState[:u][][:, 1]
+# (-0.3) * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1] #+ (-0.01) * pinv(VisionErrSys[:B]) * VisionErrState[:xi][][:, 1]
+# VisionErrSys[:B]
+# running = true
+# (-0.0001) * pinv(VisionErrSys[:B]) * (pinv(VisionErrSys[:C]) * (VisionErrState[:x][][:, 1] - VisionErrSys[:D] * VisionErrState[:u][][:, 2]))
+# VisionErrState[:u][][:, 4]
+# VisionErrSys[:B]
+# VisionErrState[:u][][:, :]
+
+
+# LibSerialPort.open(portname1, baudrate) do sp1
+#     for i in 1:100
+#         send_motor_cmd(sp1, [-0.01, 0.0, 0.0])
+#     end
 # end
-running = false
 
-VisionErrSys[:B]
-VisionErrState[:u][][:, :]
-
-
-LibSerialPort.open(portname1, baudrate) do sp1
-    send_motor_cmd(sp1, [0.0, 
-    -0.16, -0.0])
-end
-
-1.0 * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1]
+# 1.0 * pinv(VisionErrSys[:B]) * VisionErrState[:x][][:, 1]
